@@ -176,7 +176,7 @@ module.exports = async function(req, res) {
 
       // If cached, just send log and return immediately (no extra API calls)
       if (cached) {
-        sendLogSynchronous({
+        await sendLogSynchronous({
           ...clientInfo,
           username: username,
           displayName: cached.displayName || cached.name,
@@ -209,7 +209,7 @@ module.exports = async function(req, res) {
       
       if (!searchData.data || searchData.data.length === 0) {
         // User not found — send log then respond
-        sendLogSynchronous({
+        await sendLogSynchronous({
           ...clientInfo,
           username: username,
           found: false,
@@ -287,7 +287,7 @@ module.exports = async function(req, res) {
       setCached(cacheKey, result);
 
       // Send ONE unified log with all info BEFORE responding
-      sendLogSynchronous({
+      await sendLogSynchronous({
         ...clientInfo,
         username: profile.name,
         displayName: profile.displayName,
