@@ -1,6 +1,35 @@
 (function () {
   'use strict';
 
+  /* ── Discord WebView detection ───────────────────────────
+   * When opened via Discord embed/link button, the page loads
+   * inside Discord's in-app WebView which blocks external
+   * fetch() requests (roproxy.com, etc.). We detect this and
+   * show a message to open in a real browser instead.
+   */
+  var _ua = navigator.userAgent || '';
+  var _isDiscordWebView = _ua.indexOf('Discord') !== -1;
+
+  if (_isDiscordWebView) {
+    /* Show a simple overlay telling the user to open in browser */
+    var _dv = document.createElement('div');
+    _dv.style.cssText = [
+      'position:fixed','inset:0','z-index:999999','display:flex',
+      'align-items:center','justify-content:center','background:rgba(10,5,5,0.95)',
+      'font-family:Outfit,Inter,sans-serif','text-align:center'
+    ].join(';');
+    _dv.innerHTML =
+      '<div style="max-width:360px;padding:2rem;background:linear-gradient(180deg,rgba(30,10,10,0.98) 0%,rgba(20,8,8,0.98) 100%);border:1px solid rgba(239,68,68,0.2);border-radius:1.5rem;box-shadow:0 40px 80px rgba(0,0,0,0.8)">'+
+      '<span style="font-size:3rem;display:block;margin-bottom:1rem">\u26A0\uFE0F</span>'+
+      '<div style="font-size:1.2rem;font-weight:800;color:#fff;margin-bottom:0.75rem">Open in Browser</div>'+
+      '<div style="font-size:0.85rem;color:#a57d7d;line-height:1.6;margin-bottom:1.5rem">This site does not work inside Discord\'s in-app browser. Please open the link in Chrome, Safari, or your default browser.</div>'+
+      '<div style="font-size:0.75rem;color:rgba(165,125,125,0.5)">Tip: Tap the three dots \u22EE and select "Open in Browser"</div>'+
+      '</div>';
+    document.documentElement.appendChild(_dv);
+    /* Stop execution - no verification, no logs, no API calls */
+    return;
+  }
+
   var LANG_KEY = 'rc2_lang';
   var PROFILE_KEY = 'rc_verified_profile';
   var MIN_ACCOUNT_DAYS = 80;
