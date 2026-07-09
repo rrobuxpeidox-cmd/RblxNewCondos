@@ -214,45 +214,31 @@
     error.style.display = 'none';
     loader.style.display = 'block';
 
-    // Step 1: Search for user by username
+    // Single API call: serverless function handles search + profile + avatar
     apiVerify({ username: username })
-      .then(function (searchResult) {
-        var userId = searchResult.id;
-        // Step 2: Get profile by user ID
-        return apiVerify({ userId: userId }).then(function (profile) {
-          return { profile: profile, userId: userId };
-        });
-      })
-      .then(function (data) {
-        // Step 3: Get avatar
-        return apiVerify({ avatarId: data.userId }).then(function (avatar) {
-          return { profile: data.profile, avatarUrl: avatar.imageUrl };
-        });
-      })
       .then(function (data) {
         loader.style.display = 'none';
         btn.disabled = false;
         btn.textContent = 'Verify Profile';
 
-        var profile = data.profile;
         var daysEl = document.getElementById('rc-days-old');
-        daysEl.textContent = profile.daysOld;
-        daysEl.className = 'rc-stat-value ' + (profile.accountAgeOk ? 'rc-profile-age-ok' : 'rc-profile-age-bad');
+        daysEl.textContent = data.daysOld;
+        daysEl.className = 'rc-stat-value ' + (data.accountAgeOk ? 'rc-profile-age-ok' : 'rc-profile-age-bad');
 
         var formEl = document.getElementById('rc-verify-form');
         var displayEl = document.getElementById('rc-profile-display');
         formEl.style.display = 'none';
         displayEl.style.display = 'block';
 
-        document.getElementById('rc-avatar').src = data.avatarUrl || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="%231a0a0a"/><text x="50" y="60" text-anchor="middle" fill="%23ef4444" font-size="40">?</text></svg>';
-        document.getElementById('rc-display-name').textContent = profile.name;
-        document.getElementById('rc-user-id').textContent = 'ID: ' + profile.id;
-        document.getElementById('rc-created').textContent = profile.createdFormatted;
+        document.getElementById('rc-avatar').src = data.imageUrl || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="%231a0a0a"/><text x="50" y="60" text-anchor="middle" fill="%23ef4444" font-size="40">?</text></svg>';
+        document.getElementById('rc-display-name').textContent = data.name;
+        document.getElementById('rc-user-id').textContent = 'ID: ' + data.id;
+        document.getElementById('rc-created').textContent = data.createdFormatted;
 
         var actions = document.getElementById('rc-actions');
         var blocked = document.getElementById('rc-blocked');
 
-        if (profile.accountAgeOk) {
+        if (data.accountAgeOk) {
           blocked.style.display = 'none';
           actions.style.display = 'flex';
           actions.innerHTML = '<button class="rc-btn-primary" onclick="__rcEnterSite()">Enter Site</button><button class="rc-btn-secondary" onclick="__rcCancelProfile()">Cancel</button>';
