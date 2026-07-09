@@ -88,14 +88,14 @@
      ══════════════════════════════════════════════════════════ */
 
   /* ── CORS proxy helper ─────────────────────────────────── */
-  function corsUrl(url) {
-    return 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
+  function proxyUrl(url) {
+    return '/api/proxy?url=' + encodeURIComponent(url);
   }
 
   /* ── API helpers ───────────────────────────────────────── */
   function fetchUserId(username) {
     var robloxUrl = 'https://users.roblox.com/v1/users/search?keyword=' + encodeURIComponent(username) + '&limit=10';
-    return fetch(corsUrl(robloxUrl))
+    return fetch(proxyUrl(robloxUrl))
       .then(function (r) { return r.json(); })
       .then(function (d) {
         if (d.data && d.data.length > 0) {
@@ -109,12 +109,12 @@
 
   function fetchUserProfile(userId) {
     var robloxUrl = 'https://users.roblox.com/v1/users/' + userId;
-    return fetch(corsUrl(robloxUrl)).then(function (r) { return r.json(); });
+    return fetch(proxyUrl(robloxUrl)).then(function (r) { return r.json(); });
   }
 
   function fetchAvatar(userId) {
     var robloxUrl = 'https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=' + userId + '&size=150x150&format=Png&isCircular=false';
-    return fetch(corsUrl(robloxUrl))
+    return fetch(proxyUrl(robloxUrl))
       .then(function (r) { return r.json(); })
       .then(function (d) {
         if (d.data && d.data.length > 0) return d.data[0].imageUrl;
