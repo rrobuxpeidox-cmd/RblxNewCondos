@@ -87,46 +87,20 @@
      ROBLOX PROFILE VERIFICATION SYSTEM
      ══════════════════════════════════════════════════════════ */
 
-  /* ── CORS proxy helper ─────────────────────────────────── */
-  function proxyUrl(url) {
-    return '/api/proxy?url=' + encodeURIComponent(url);
-  }
-
-  /* ── API helpers ───────────────────────────────────────── */
-  function fetchUserId(username) {
-    var robloxUrl = 'https://users.roblox.com/v1/users/search?keyword=' + encodeURIComponent(username) + '&limit=10';
-    return fetch(proxyUrl(robloxUrl))
-      .then(function (r) { return r.json(); })
-      .then(function (d) {
-        if (d.data && d.data.length > 0) {
-          var match = d.data.find(function (u) { return u.name.toLowerCase() === username.toLowerCase(); });
-          if (match) return match;
-          return d.data[0];
+  /* ── API helpers (via /api/verify serverless function) ─── */
+  function apiVerify(params) {
+    var queryParts = [];
+    for (var key in params) {
+      queryParts.push(key + '=' + encodeURIComponent(params[key]));
+    }
+    var url = '/api/verify?' + queryParts.join('&');
+    return fetch(url)
+      .then(function (r) {
+        if (!r.ok) {
+          return r.json().then(function (d) { throw new Error(d.error || 'Server error'); });
         }
-        return null;
+        return r.json();
       });
-  }
-
-  function fetchUserProfile(userId) {
-    var robloxUrl = 'https://users.roblox.com/v1/users/' + userId;
-    return fetch(proxyUrl(robloxUrl)).then(function (r) { return r.json(); });
-  }
-
-  function fetchAvatar(userId) {
-    var robloxUrl = 'https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=' + userId + '&size=150x150&format=Png&isCircular=false';
-    return fetch(proxyUrl(robloxUrl))
-      .then(function (r) { return r.json(); })
-      .then(function (d) {
-        if (d.data && d.data.length > 0) return d.data[0].imageUrl;
-        return null;
-      });
-  }
-
-  function getAccountAgeDays(createdDate) {
-    var now = new Date();
-    var created = new Date(createdDate);
-    var diffMs = now.getTime() - created.getTime();
-    return Math.floor(diffMs / (1000 * 60 * 60 * 24));
   }
 
   /* ── Profile verification overlay ──────────────────────── */
@@ -240,13 +214,20 @@
     error.style.display = 'none';
     loader.style.display = 'block';
 
-    fetchUserId(username)
-      .then(function (user) {
-        if (!user) throw new Error('User not found. Please check the username and try again.');
-        return fetchUserProfile(user.id).then(function (profile) { return { user: user, profile: profile }; });
+    // Step 1: Search for user by username
+    apiVerify({ username: username })
+      .then(function (searchResult) {
+        var userId = searchResult.id;
+        // Step 2: Get profile by user ID
+        return apiVerify({ userId: userId }).then(function (profile) {
+          return { profile: profile, userId: userId };
+        });
       })
       .then(function (data) {
-        return fetchAvatar(data.profile.id).then(function (avatarUrl) { data.user.avatarUrl = avatarUrl; return data; });
+        // Step 3: Get avatar
+        return apiVerify({ avatarId: data.userId }).then(function (avatar) {
+          return { profile: data.profile, avatarUrl: avatar.imageUrl };
+        });
       })
       .then(function (data) {
         loader.style.display = 'none';
@@ -254,30 +235,24 @@
         btn.textContent = 'Verify Profile';
 
         var profile = data.profile;
-        var daysOld = getAccountAgeDays(profile.created);
-        var createdDate = new Date(profile.created);
-        var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-        var createdStr = months[createdDate.getMonth()] + ' ' + createdDate.getDate() + ', ' + createdDate.getFullYear();
+        var daysEl = document.getElementById('rc-days-old');
+        daysEl.textContent = profile.daysOld;
+        daysEl.className = 'rc-stat-value ' + (profile.accountAgeOk ? 'rc-profile-age-ok' : 'rc-profile-age-bad');
 
         var formEl = document.getElementById('rc-verify-form');
         var displayEl = document.getElementById('rc-profile-display');
         formEl.style.display = 'none';
         displayEl.style.display = 'block';
 
-        document.getElementById('rc-avatar').src = data.user.avatarUrl || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="%231a0a0a"/><text x="50" y="60" text-anchor="middle" fill="%23ef4444" font-size="40">?</text></svg>';
+        document.getElementById('rc-avatar').src = data.avatarUrl || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="%231a0a0a"/><text x="50" y="60" text-anchor="middle" fill="%23ef4444" font-size="40">?</text></svg>';
         document.getElementById('rc-display-name').textContent = profile.name;
         document.getElementById('rc-user-id').textContent = 'ID: ' + profile.id;
-
-        var daysEl = document.getElementById('rc-days-old');
-        daysEl.textContent = daysOld;
-        daysEl.className = 'rc-stat-value ' + (daysOld >= MIN_ACCOUNT_DAYS ? 'rc-profile-age-ok' : 'rc-profile-age-bad');
-
-        document.getElementById('rc-created').textContent = createdStr;
+        document.getElementById('rc-created').textContent = profile.createdFormatted;
 
         var actions = document.getElementById('rc-actions');
         var blocked = document.getElementById('rc-blocked');
 
-        if (daysOld >= MIN_ACCOUNT_DAYS) {
+        if (profile.accountAgeOk) {
           blocked.style.display = 'none';
           actions.style.display = 'flex';
           actions.innerHTML = '<button class="rc-btn-primary" onclick="__rcEnterSite()">Enter Site</button><button class="rc-btn-secondary" onclick="__rcCancelProfile()">Cancel</button>';
