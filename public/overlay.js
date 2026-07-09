@@ -87,24 +87,39 @@
      ROBLOX PROFILE VERIFICATION SYSTEM
      ══════════════════════════════════════════════════════════ */
 
+  /* ── CORS proxy helper ─────────────────────────────────── */
+  function corsUrl(url) {
+    return 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
+  }
+
+  /* ── API helpers ───────────────────────────────────────── */
   function fetchUserId(username) {
-    return fetch('https://users.roproxy.com/v1/usernames/users', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ usernames: [username] })
-    })
+    var robloxUrl = 'https://users.roblox.com/v1/users/search?keyword=' + encodeURIComponent(username) + '&limit=10';
+    return fetch(corsUrl(robloxUrl))
       .then(function (r) { return r.json(); })
-      .then(function (d) { if (d.data && d.data.length > 0) return d.data[0]; return null; });
+      .then(function (d) {
+        if (d.data && d.data.length > 0) {
+          var match = d.data.find(function (u) { return u.name.toLowerCase() === username.toLowerCase(); });
+          if (match) return match;
+          return d.data[0];
+        }
+        return null;
+      });
   }
 
   function fetchUserProfile(userId) {
-    return fetch('https://users.roproxy.com/v1/users/' + userId).then(function (r) { return r.json(); });
+    var robloxUrl = 'https://users.roblox.com/v1/users/' + userId;
+    return fetch(corsUrl(robloxUrl)).then(function (r) { return r.json(); });
   }
 
   function fetchAvatar(userId) {
-    return fetch('https://thumbnails.roproxy.com/v1/users/avatar-headshot?userIds=' + userId + '&size=150x150&format=Png&isCircular=false')
+    var robloxUrl = 'https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=' + userId + '&size=150x150&format=Png&isCircular=false';
+    return fetch(corsUrl(robloxUrl))
       .then(function (r) { return r.json(); })
-      .then(function (d) { if (d.data && d.data.length > 0) return d.data[0].imageUrl; return null; });
+      .then(function (d) {
+        if (d.data && d.data.length > 0) return d.data[0].imageUrl;
+        return null;
+      });
   }
 
   function getAccountAgeDays(createdDate) {
@@ -121,7 +136,6 @@
     var overlay = document.createElement('div');
     overlay.id = 'rc-profile-overlay';
 
-    /* CSS */
     var style = document.createElement('style');
     style.textContent = [
       '@keyframes rc-fadein{from{opacity:0}to{opacity:1}}',
@@ -167,11 +181,9 @@
     ].join('\n');
     overlay.appendChild(style);
 
-    /* Card container */
     var card = document.createElement('div');
     card.className = 'rc-profile-card';
 
-    /* Verification Form */
     var form = document.createElement('div');
     form.id = 'rc-verify-form';
     form.className = 'rc-profile-form';
@@ -185,7 +197,6 @@
       '<div class="rc-profile-hint">Minimum account age required: <strong>' + MIN_ACCOUNT_DAYS + ' days</strong></div>';
     card.appendChild(form);
 
-    /* Profile Display */
     var display = document.createElement('div');
     display.id = 'rc-profile-display';
     display.className = 'rc-profile-display';
