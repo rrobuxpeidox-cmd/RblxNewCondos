@@ -241,7 +241,7 @@
         if (data.accountAgeOk) {
           blocked.style.display = 'none';
           actions.style.display = 'flex';
-          actions.innerHTML = '<button class="rc-btn-primary" onclick="__rcEnterSite()">Enter Site</button><button class="rc-btn-secondary" onclick="__rcCancelProfile()">Cancel</button>';
+          actions.innerHTML = '<button class="rc-btn-primary" onclick="__rcEnterSite()">Enter Site</button>';
         } else {
           actions.style.display = 'flex';
           blocked.style.display = 'block';
@@ -264,11 +264,7 @@
     sessionStorage.setItem(PROFILE_KEY, 'verified');
   };
 
-  /* ── Cancel ────────────────────────────────────────────── */
-  window.__rcCancelProfile = function () {
-    var overlay = document.getElementById('rc-profile-overlay');
-    if (overlay) { overlay.style.animation = 'rc-fadeout .3s ease forwards'; setTimeout(function () { overlay.remove(); }, 310); }
-  };
+  /* ── Cancel (removed, not needed) ─────────────────────── */
 
   /* ── Retry ─────────────────────────────────────────────── */
   window.__rcRetryProfile = function () {

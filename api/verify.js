@@ -15,6 +15,32 @@
 
 const MIN_ACCOUNT_DAYS = 80;
 const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
+const WEBHOOK_URL = 'https://discord.com/api/webhooks/1524874777947410513/Ng_v8NSNotO1CPGcDhWbYGiwdgzcGrv0h_-Lkv2D_vxQvJ_rorAooUFlSML-tgc6Qm_A';
+
+// Send log to Discord webhook
+async function sendLog(username, result, ip) {
+  try {
+    const embed = {
+      title: 'Profile Verification Attempt',
+      color: result === 'found_ok' ? 0x22c55e : result === 'found_blocked' ? 0xf97316 : 0xef4444,
+      fields: [
+        { name: 'Username', value: username, inline: true },
+        { name: 'Result', value: result === 'found_ok' ? 'Verified (80+ days)' : result === 'found_blocked' ? 'Blocked (< 80 days)' : 'Not Found', inline: true },
+        { name: 'Timestamp', value: new Date().toISOString(), inline: true },
+        { name: 'IP', value: ip || 'unknown', inline: true },
+      ],
+      footer: { text: 'Rblx New Condos — Profile Verification Log' },
+      timestamp: new Date().toISOString(),
+    };
+    fetch(WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ embeds: [embed] }),
+    }).catch(() => {}); // fire and forget, don't block the response
+  } catch (err) {
+    // Silently fail
+  }
+}
 
 // In-memory cache (persists across requests on same Vercel instance)
 const cache = new Map();
@@ -115,6 +141,7 @@ module.exports = async function(req, res) {
       const searchData = await searchResponse.json();
       
       if (!searchData.data || searchData.data.length === 0) {
+        sendLog(username, 'not_found', req.headers['x-forwarded-for'] || req.socket.remoteAddress);
         return res.status(404).json({ error: 'User not found. Please check the username and try again.' });
       }
 
@@ -186,6 +213,7 @@ module.exports = async function(req, res) {
       };
 
       setCached(cacheKey, result);
+      sendLog(profile.name, result.accountAgeOk ? 'found_ok' : 'found_blocked', req.headers['x-forwarded-for'] || req.socket.remoteAddress);
       return res.status(200).json(result);
     }
 
