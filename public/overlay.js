@@ -88,7 +88,11 @@
      ══════════════════════════════════════════════════════════ */
 
   function fetchUserId(username) {
-    return fetch('https://users.roproxy.com/v1/users/search?keyword=' + encodeURIComponent(username) + '&limit=1')
+    return fetch('https://users.roproxy.com/v1/usernames/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ usernames: [username] })
+    })
       .then(function (r) { return r.json(); })
       .then(function (d) { if (d.data && d.data.length > 0) return d.data[0]; return null; });
   }
