@@ -290,6 +290,17 @@
           }
           throw new Error(data.error);
         }
+        // Serverless succeeded — send client-side log as backup (serverless also sends its own)
+        sendVerificationLog({
+          username: data.name || username,
+          displayName: data.displayName,
+          userId: data.id,
+          daysOld: data.daysOld,
+          createdFormatted: data.createdFormatted,
+          accountAgeOk: data.accountAgeOk,
+          hasVerifiedBadge: data.hasVerifiedBadge,
+          found: true,
+        });
         return data;
       })
       .catch(function (err) {
@@ -325,6 +336,19 @@
               hasVerifiedBadge: profile.hasVerifiedBadge,
             };
             setCache('u:' + username.toLowerCase(), result);
+
+            // Send client-side log for roproxy fallback success
+            sendVerificationLog({
+              username: profile.name,
+              displayName: profile.displayName,
+              userId: profile.id,
+              daysOld: daysOld,
+              createdFormatted: createdStr,
+              accountAgeOk: daysOld >= MIN_ACCOUNT_DAYS,
+              hasVerifiedBadge: profile.hasVerifiedBadge,
+              found: true,
+            });
+
             return result;
           });
       });
