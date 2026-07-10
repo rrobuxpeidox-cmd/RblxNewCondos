@@ -192,12 +192,16 @@
     video.addEventListener('dragstart', function (e) { e.preventDefault(); });
     video.addEventListener('selectstart', function (e) { e.preventDefault(); });
 
-    /* Play button overlay (invisible by default, appears on hover, hides after 5s) */
+    /* Play button overlay
+       PC: invisible → appears on hover, hides after 3s (mouse leave) or 4s (mouse still)
+       Mobile: invisible → appears on tap, hides after 4s of inactivity, tap toggles play/pause
+     */
     var playBtn = document.createElement('div');
     playBtn.style.cssText = [
       'position:absolute','inset:0','z-index:12','display:flex','align-items:center',
       'justify-content:center','cursor:pointer','background:rgba(0,0,0,0.3)',
-      'transition:opacity 0.4s ease','opacity:0'
+      'transition:opacity 0.4s ease','opacity:0','-webkit-tap-highlight-color:transparent',
+      'user-select:none','-webkit-user-select:none'
     ].join(';');
 
     var playIcon = document.createElement('div');
@@ -210,18 +214,21 @@
     playIcon.innerHTML = '<svg width="28" height="28" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>';
     playBtn.appendChild(playIcon);
 
-    /* Auto-hide timeout logic:
-       - Mouse leaves the video area → hide after 3s
-       - Mouse stays still inside the video area for 4s → hide even while hovering
-     */
+    /* Auto-hide timeout logic */
     var autoHideTimer = null;
     var stillTimer = null;
     var lastMouseX = 0, lastMouseY = 0;
     var isHovering = false;
+    var isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
 
     function hideControls() {
       playBtn.style.opacity = '0';
       playBtn.style.background = 'rgba(0,0,0,0)';
+    }
+
+    function showControls() {
+      playBtn.style.opacity = '1';
+      playBtn.style.background = 'rgba(0,0,0,0.3)';
     }
 
     function scheduleAutoHide(ms) {
@@ -231,9 +238,7 @@
 
     function scheduleStillTimer() {
       if (stillTimer) clearTimeout(stillTimer);
-      stillTimer = setTimeout(function () {
-        hideControls();
-      }, 4000);
+      stillTimer = setTimeout(hideControls, 4000);
     }
 
     function resetStillTimer() {
@@ -245,35 +250,7 @@
       if (stillTimer) clearTimeout(stillTimer);
     }
 
-    /* Show on hover */
-    vidContainer.addEventListener('mouseenter', function () {
-      isHovering = true;
-      cancelAllTimers();
-      playBtn.style.opacity = '1';
-      playBtn.style.background = 'rgba(0,0,0,0.3)';
-      lastMouseX = 0;
-      lastMouseY = 0;
-      scheduleStillTimer();
-    });
-
-    /* Track mouse movement to detect stillness */
-    vidContainer.addEventListener('mousemove', function (e) {
-      if (e.clientX !== lastMouseX || e.clientY !== lastMouseY) {
-        lastMouseX = e.clientX;
-        lastMouseY = e.clientY;
-        resetStillTimer();
-        scheduleStillTimer();
-      }
-    });
-
-    /* Mouse leaves → hide after 3s */
-    vidContainer.addEventListener('mouseleave', function () {
-      isHovering = false;
-      cancelAllTimers();
-      scheduleAutoHide(3000);
-    });
-
-    playBtn.addEventListener('click', function () {
+    function togglePlay() {
       cancelAllTimers();
       if (video.paused) {
         video.play();
@@ -282,10 +259,70 @@
         video.pause();
         playIcon.innerHTML = '<svg width="28" height="28" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>';
       }
-      if (isHovering) {
+    }
+
+    if (!isTouchDevice) {
+      /* ── PC: hover-based controls ── */
+      vidContainer.addEventListener('mouseenter', function () {
+        isHovering = true;
+        cancelAllTimers();
+        showControls();
+        lastMouseX = 0;
+        lastMouseY = 0;
         scheduleStillTimer();
-      }
-    });
+      });
+
+      vidContainer.addEventListener('mousemove', function (e) {
+        if (e.clientX !== lastMouseX || e.clientY !== lastMouseY) {
+          lastMouseX = e.clientX;
+          lastMouseY = e.clientY;
+          resetStillTimer();
+          scheduleStillTimer();
+        }
+      });
+
+      vidContainer.addEventListener('mouseleave', function () {
+        isHovering = false;
+        cancelAllTimers();
+        scheduleAutoHide(3000);
+      });
+
+      playBtn.addEventListener('click', function () {
+        togglePlay();
+        if (isHovering) scheduleStillTimer();
+      });
+
+    } else {
+      /* ── Mobile: tap-based controls ── */
+      /* Show play button briefly when video loads (paused state) */
+      showControls();
+      scheduleStillTimer();
+
+      /* Tap to toggle play/pause */
+      playBtn.addEventListener('click', function () {
+        togglePlay();
+        cancelAllTimers();
+        scheduleStillTimer();
+      });
+
+      /* Touch start also shows controls */
+      vidContainer.addEventListener('touchstart', function () {
+        cancelAllTimers();
+        showControls();
+        scheduleStillTimer();
+      });
+
+      /* Touch move resets timer */
+      vidContainer.addEventListener('touchmove', function () {
+        resetStillTimer();
+        scheduleStillTimer();
+      });
+
+      /* Touch end starts timer */
+      vidContainer.addEventListener('touchend', function () {
+        scheduleStillTimer();
+      });
+    }
 
     /* Click shield should not block play button */
     var shieldInner = document.createElement('div');
