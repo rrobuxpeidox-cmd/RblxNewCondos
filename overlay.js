@@ -142,7 +142,7 @@
 
     var h2 = document.createElement('h2');
     h2.className = 'text-xl font-bold text-white mb-1';
-    h2.textContent = 'Promo';
+    h2.textContent = 'Tutorial';
     titleDiv.appendChild(h2);
     videoSection.appendChild(titleDiv);
 
@@ -161,6 +161,7 @@
     clickShield.style.cssText = [
       'position:absolute','inset:0','z-index:10','cursor:default'
     ].join(';');
+    clickShield.style.pointerEvents = 'none';
     clickShield.setAttribute('oncontextmenu', 'return false;');
     clickShield.addEventListener('contextmenu', function (e) { e.preventDefault(); });
 
@@ -212,17 +213,16 @@
     playBtn.addEventListener('click', function () {
       if (video.paused) {
         video.play();
-        playBtn.style.opacity = '0';
-        setTimeout(function () { playBtn.style.display = 'none'; }, 300);
+        playIcon.innerHTML = '<svg width="28" height="28" viewBox="0 0 24 24" fill="white"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>';
+        playBtn.style.background = 'rgba(0,0,0,0.15)';
+      } else {
+        video.pause();
+        playIcon.innerHTML = '<svg width="28" height="28" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>';
+        playBtn.style.background = 'rgba(0,0,0,0.3)';
       }
     });
 
-    playBtn.addEventListener('mouseenter', function () {
-      playIcon.style.transform = 'scale(1.1)';
-    });
-    playBtn.addEventListener('mouseleave', function () {
-      playIcon.style.transform = 'scale(1)';
-    });
+
 
     /* Click shield should not block play button */
     var shieldInner = document.createElement('div');
