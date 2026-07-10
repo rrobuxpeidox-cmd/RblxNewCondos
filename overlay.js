@@ -174,7 +174,7 @@
 
     /* Video element */
     var video = document.createElement('video');
-    video.autoplay = true;
+    video.autoplay = false;
     video.muted = false;
     video.loop = true;
     video.playsInline = true;
