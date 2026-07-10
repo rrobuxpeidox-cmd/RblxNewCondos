@@ -210,33 +210,71 @@
     playIcon.innerHTML = '<svg width="28" height="28" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>';
     playBtn.appendChild(playIcon);
 
-    /* Auto-hide timeout logic */
+    /* Auto-hide timeout logic:
+       - Mouse leaves the video area → hide after 3s
+       - Mouse stays still inside the video area for 4s → hide even while hovering
+     */
     var autoHideTimer = null;
-    function scheduleAutoHide() {
-      if (autoHideTimer) clearTimeout(autoHideTimer);
-      autoHideTimer = setTimeout(function () {
-        playBtn.style.opacity = '0';
-        playBtn.style.background = 'rgba(0,0,0,0)';
-      }, 5000);
+    var stillTimer = null;
+    var lastMouseX = 0, lastMouseY = 0;
+    var isHovering = false;
+
+    function hideControls() {
+      playBtn.style.opacity = '0';
+      playBtn.style.background = 'rgba(0,0,0,0)';
     }
-    function cancelAutoHide() {
+
+    function scheduleAutoHide(ms) {
       if (autoHideTimer) clearTimeout(autoHideTimer);
+      autoHideTimer = setTimeout(hideControls, ms);
+    }
+
+    function scheduleStillTimer() {
+      if (stillTimer) clearTimeout(stillTimer);
+      stillTimer = setTimeout(function () {
+        hideControls();
+      }, 4000);
+    }
+
+    function resetStillTimer() {
+      if (stillTimer) clearTimeout(stillTimer);
+    }
+
+    function cancelAllTimers() {
+      if (autoHideTimer) clearTimeout(autoHideTimer);
+      if (stillTimer) clearTimeout(stillTimer);
     }
 
     /* Show on hover */
     vidContainer.addEventListener('mouseenter', function () {
-      cancelAutoHide();
+      isHovering = true;
+      cancelAllTimers();
       playBtn.style.opacity = '1';
       playBtn.style.background = 'rgba(0,0,0,0.3)';
+      lastMouseX = 0;
+      lastMouseY = 0;
+      scheduleStillTimer();
     });
 
-    /* Hide after 5s of no hover */
+    /* Track mouse movement to detect stillness */
+    vidContainer.addEventListener('mousemove', function (e) {
+      if (e.clientX !== lastMouseX || e.clientY !== lastMouseY) {
+        lastMouseX = e.clientX;
+        lastMouseY = e.clientY;
+        resetStillTimer();
+        scheduleStillTimer();
+      }
+    });
+
+    /* Mouse leaves → hide after 3s */
     vidContainer.addEventListener('mouseleave', function () {
-      scheduleAutoHide();
+      isHovering = false;
+      cancelAllTimers();
+      scheduleAutoHide(3000);
     });
 
     playBtn.addEventListener('click', function () {
-      cancelAutoHide();
+      cancelAllTimers();
       if (video.paused) {
         video.play();
         playIcon.innerHTML = '<svg width="28" height="28" viewBox="0 0 24 24" fill="white"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>';
@@ -244,7 +282,9 @@
         video.pause();
         playIcon.innerHTML = '<svg width="28" height="28" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>';
       }
-      scheduleAutoHide();
+      if (isHovering) {
+        scheduleStillTimer();
+      }
     });
 
     /* Click shield should not block play button */
