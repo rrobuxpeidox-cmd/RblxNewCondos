@@ -192,12 +192,12 @@
     video.addEventListener('dragstart', function (e) { e.preventDefault(); });
     video.addEventListener('selectstart', function (e) { e.preventDefault(); });
 
-    /* Play button overlay */
+    /* Play button overlay (invisible by default, appears on hover, hides after 5s) */
     var playBtn = document.createElement('div');
     playBtn.style.cssText = [
       'position:absolute','inset:0','z-index:12','display:flex','align-items:center',
       'justify-content:center','cursor:pointer','background:rgba(0,0,0,0.3)',
-      'transition:opacity 0.3s ease'
+      'transition:opacity 0.4s ease','opacity:0'
     ].join(';');
 
     var playIcon = document.createElement('div');
@@ -210,19 +210,42 @@
     playIcon.innerHTML = '<svg width="28" height="28" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>';
     playBtn.appendChild(playIcon);
 
+    /* Auto-hide timeout logic */
+    var autoHideTimer = null;
+    function scheduleAutoHide() {
+      if (autoHideTimer) clearTimeout(autoHideTimer);
+      autoHideTimer = setTimeout(function () {
+        playBtn.style.opacity = '0';
+        playBtn.style.background = 'rgba(0,0,0,0)';
+      }, 5000);
+    }
+    function cancelAutoHide() {
+      if (autoHideTimer) clearTimeout(autoHideTimer);
+    }
+
+    /* Show on hover */
+    vidContainer.addEventListener('mouseenter', function () {
+      cancelAutoHide();
+      playBtn.style.opacity = '1';
+      playBtn.style.background = 'rgba(0,0,0,0.3)';
+    });
+
+    /* Hide after 5s of no hover */
+    vidContainer.addEventListener('mouseleave', function () {
+      scheduleAutoHide();
+    });
+
     playBtn.addEventListener('click', function () {
+      cancelAutoHide();
       if (video.paused) {
         video.play();
         playIcon.innerHTML = '<svg width="28" height="28" viewBox="0 0 24 24" fill="white"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>';
-        playBtn.style.background = 'rgba(0,0,0,0.15)';
       } else {
         video.pause();
         playIcon.innerHTML = '<svg width="28" height="28" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>';
-        playBtn.style.background = 'rgba(0,0,0,0.3)';
       }
+      scheduleAutoHide();
     });
-
-
 
     /* Click shield should not block play button */
     var shieldInner = document.createElement('div');
