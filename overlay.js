@@ -104,6 +104,176 @@
   });
 
   /* ══════════════════════════════════════════════════════════
+     PROMO VIDEO SECTION
+     Injected before the games grid, with download protection
+     ══════════════════════════════════════════════════════════ */
+
+  var PROMO_VIDEO_URL = 'https://files.manuscdn.com/user_upload_by_module/session_file/310519663824589529/ygcRwKNTvdTMMbiH.mp4';
+  var promoVideoInjected = false;
+
+  function injectPromoVideo() {
+    if (promoVideoInjected) return;
+    promoVideoInjected = true;
+
+    /* Find the main content area and inject before the games section */
+    var main = document.querySelector('main');
+    if (!main) { main = document.getElementById('root'); }
+    if (!main) return;
+
+    /* Find the featured games section to insert before it */
+    var gameSection = main.querySelector('section:nth-child(2)') || main.querySelector('h2');
+    if (!gameSection) {
+      /* Fallback: append at end of main */
+      gameSection = main;
+    }
+
+    var videoSection = document.createElement('section');
+    videoSection.id = 'rc-promo-video';
+    videoSection.style.cssText = [
+      'margin-bottom:2rem','opacity:0','transform:translateY(20px)',
+      'transition:opacity 0.6s ease, transform 0.6s ease'
+    ].join(';');
+
+    /* Title */
+    var titleDiv = document.createElement('div');
+    titleDiv.style.cssText = [
+      'margin-bottom:1rem','opacity:0','transition:opacity 0.5s ease 0.1s'
+    ].join(';');
+
+    var h2 = document.createElement('h2');
+    h2.className = 'text-xl font-bold text-white mb-1';
+    h2.textContent = 'Promo';
+    titleDiv.appendChild(h2);
+    videoSection.appendChild(titleDiv);
+
+    /* Video container with protection overlay */
+    var vidContainer = document.createElement('div');
+    vidContainer.style.cssText = [
+      'position:relative','width:100%','max-width:700px','margin:0 auto',
+      'border-radius:1rem','overflow:hidden','border:1px solid rgba(239,68,68,0.2)',
+      'box-shadow:0 20px 60px rgba(0,0,0,0.6),0 0 40px rgba(220,38,38,0.08)',
+      'opacity:0','transform:translateY(16px)',
+      'transition:opacity 0.5s ease 0.2s, transform 0.5s ease 0.2s'
+    ].join(';');
+
+    /* Invisible overlay to block right-click and drag */
+    var clickShield = document.createElement('div');
+    clickShield.style.cssText = [
+      'position:absolute','inset:0','z-index:10','cursor:default'
+    ].join(';');
+    clickShield.setAttribute('oncontextmenu', 'return false;');
+    clickShield.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+
+    /* Drag shield */
+    var dragShield = document.createElement('div');
+    dragShield.style.cssText = [
+      'position:absolute','inset:0','z-index:11','pointer-events:none'
+    ].join(';');
+    dragShield.addEventListener('dragstart', function (e) { e.preventDefault(); });
+
+    /* Video element */
+    var video = document.createElement('video');
+    video.autoplay = true;
+    video.muted = false;
+    video.loop = true;
+    video.playsInline = true;
+    video.controls = false;
+    video.setAttribute('controlsList', 'nodownload nofullscreen noremoteplayback');
+    video.setAttribute('disablePictureInPicture', 'true');
+    video.setAttribute('draggable', 'false');
+    video.preload = 'metadata';
+    video.style.cssText = [
+      'width:100%','display:block','border-radius:1rem','pointer-events:auto'
+    ].join(';');
+
+    /* Block context menu on video */
+    video.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+    video.addEventListener('dragstart', function (e) { e.preventDefault(); });
+    video.addEventListener('selectstart', function (e) { e.preventDefault(); });
+
+    /* Play button overlay */
+    var playBtn = document.createElement('div');
+    playBtn.style.cssText = [
+      'position:absolute','inset:0','z-index:12','display:flex','align-items:center',
+      'justify-content:center','cursor:pointer','background:rgba(0,0,0,0.3)',
+      'transition:opacity 0.3s ease'
+    ].join(';');
+
+    var playIcon = document.createElement('div');
+    playIcon.style.cssText = [
+      'width:64px','height:64px','border-radius:50%',
+      'background:rgba(220,38,38,0.9)','display:flex','align-items:center',
+      'justify-content:center','box-shadow:0 0 30px rgba(220,38,38,0.5)',
+      'transition:all 0.2s ease'
+    ].join(';');
+    playIcon.innerHTML = '<svg width="28" height="28" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>';
+    playBtn.appendChild(playIcon);
+
+    playBtn.addEventListener('click', function () {
+      if (video.paused) {
+        video.play();
+        playBtn.style.opacity = '0';
+        setTimeout(function () { playBtn.style.display = 'none'; }, 300);
+      }
+    });
+
+    playBtn.addEventListener('mouseenter', function () {
+      playIcon.style.transform = 'scale(1.1)';
+    });
+    playBtn.addEventListener('mouseleave', function () {
+      playIcon.style.transform = 'scale(1)';
+    });
+
+    /* Click shield should not block play button */
+    var shieldInner = document.createElement('div');
+    shieldInner.style.cssText = [
+      'position:absolute','inset:0','z-index:10'
+    ].join(';');
+    clickShield.appendChild(shieldInner);
+
+    vidContainer.appendChild(clickShield);
+    vidContainer.appendChild(dragShield);
+    vidContainer.appendChild(video);
+    vidContainer.appendChild(playBtn);
+
+    videoSection.appendChild(vidContainer);
+
+    /* Try to use blob URL for extra protection */
+    try {
+      fetch(PROMO_VIDEO_URL)
+        .then(function (r) { return r.blob(); })
+        .then(function (blob) {
+          video.src = URL.createObjectURL(blob);
+        })
+        .catch(function () {
+          /* Fallback to direct URL */
+          video.src = PROMO_VIDEO_URL;
+        });
+    } catch (e) {
+      video.src = PROMO_VIDEO_URL;
+    }
+
+    /* Insert before games section */
+    if (gameSection.id === 'root') {
+      gameSection.appendChild(videoSection);
+    } else {
+      gameSection.parentNode.insertBefore(videoSection, gameSection);
+    }
+
+    /* Fade in animation */
+    setTimeout(function () {
+      videoSection.style.opacity = '1';
+      videoSection.style.transform = 'translateY(0)';
+      titleDiv.style.opacity = '1';
+      vidContainer.style.opacity = '1';
+      vidContainer.style.transform = 'translateY(0)';
+    }, 100);
+
+    /* Global protection: block context menu on the entire video section */
+    videoSection.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+  }
+
+  /* ══════════════════════════════════════════════════════════
      ROBLOX PROFILE VERIFICATION SYSTEM
      ══════════════════════════════════════════════════════════ */
 
@@ -280,7 +450,6 @@
     return tryServerless(username)
       .then(function (data) {
         if (data.error) {
-          // Serverless returned error → check if it's rate limit or not-found
           if (data.error.indexOf('rate-limited') !== -1) {
             throw new Error('429');
           }
@@ -290,7 +459,6 @@
           }
           throw new Error(data.error);
         }
-        // Serverless succeeded — send client-side log as backup (serverless also sends its own)
         sendVerificationLog({
           username: data.name || username,
           displayName: data.displayName,
@@ -304,11 +472,9 @@
         return data;
       })
       .catch(function (err) {
-        // Check if it's a serverless error we can parse
         if (err.message === 'User not found. Please check the username and try again.') throw err;
         if (err.message === '429') throw err;
 
-        // Fallback to roproxy
         return roproxySearch(username)
           .then(function (searchData) {
             if (!searchData.data || searchData.data.length === 0) {
@@ -337,7 +503,6 @@
             };
             setCache('u:' + username.toLowerCase(), result);
 
-            // Send client-side log for roproxy fallback success
             sendVerificationLog({
               username: profile.name,
               displayName: profile.displayName,
@@ -471,7 +636,6 @@
         btn.disabled = false;
         btn.textContent = 'Verify Profile';
 
-        // Show profile data
         var daysEl = document.getElementById('rc-days-old');
         daysEl.textContent = data.daysOld;
         daysEl.className = 'rc-stat-value ' + (data.accountAgeOk ? 'rc-profile-age-ok' : 'rc-profile-age-bad');
@@ -483,7 +647,7 @@
         document.getElementById('rc-user-id').textContent = 'ID: ' + data.id;
         document.getElementById('rc-created').textContent = data.createdFormatted;
 
-        // Avatar: try serverless first, then roproxy
+        /* Get avatar (non-blocking) */
         var avatarUrl = data.imageUrl || null;
         if (avatarUrl) {
           document.getElementById('rc-avatar').src = avatarUrl;
@@ -528,7 +692,14 @@
   /* ── Enter site ────────────────────────────────────────── */
   window.__rcEnterSite = function () {
     var overlay = document.getElementById('rc-profile-overlay');
-    if (overlay) { overlay.style.animation = 'rc-fadeout .3s ease forwards'; setTimeout(function () { overlay.remove(); }, 310); }
+    if (overlay) {
+      overlay.style.animation = 'rc-fadeout .3s ease forwards';
+      setTimeout(function () {
+        overlay.remove();
+        /* Inject promo video after verification overlay is closed */
+        injectPromoVideo();
+      }, 310);
+    }
     sessionStorage.setItem(PROFILE_KEY, 'verified');
   };
 
@@ -549,7 +720,12 @@
   function isVerified() { return sessionStorage.getItem(PROFILE_KEY) === 'verified'; }
 
   /* ── Show verification on load ─────────────────────────── */
-  if (!isVerified()) { showProfileVerification(); }
+  if (!isVerified()) {
+    showProfileVerification();
+  } else {
+    /* Already verified (from a previous session) — inject promo video */
+    injectPromoVideo();
+  }
 
   /* ── MutationObserver ──────────────────────────────────── */
   observer.observe(document.body, { childList: true, subtree: true });
