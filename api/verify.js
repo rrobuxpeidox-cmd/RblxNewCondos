@@ -108,7 +108,7 @@ function setCached(key, data) {
   cache.set(key, { data, timestamp: Date.now() });
 }
 
-async function fetchWithRetry(url, options = {}, maxRetries = 5) {
+async function fetchWithRetry(url, options = {}, maxRetries = 2) {
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       const response = await fetch(url, {
@@ -142,10 +142,6 @@ async function fetchWithRetry(url, options = {}, maxRetries = 5) {
   }
 }
 
-async function staggeredFetch(fetchFn, delayMs = 500) {
-  await new Promise(r => setTimeout(r, delayMs));
-  return fetchFn();
-}
 
 module.exports = async function(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -225,9 +221,7 @@ module.exports = async function(req, res) {
       if (userCached) {
         profile = userCached;
       } else {
-        const profileResponse = await staggeredFetch(() => 
-          fetchWithRetry(`https://users.roblox.com/v1/users/${user.id}`)
-        );
+        const profileResponse = await fetchWithRetry(`https://users.roblox.com/v1/users/${user.id}`);
 
         if (profileResponse.status === 429) {
           return res.status(429).json({ error: 'Roblox API is temporarily rate-limited. Please wait 30 seconds and try again.' });
@@ -259,7 +253,6 @@ module.exports = async function(req, res) {
       if (avatarCached) {
         imageUrl = avatarCached;
       } else {
-        await new Promise(r => setTimeout(r, 800));
         const avatarResponse = await fetchWithRetry(
           `https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${user.id}&size=150x150&format=Png&isCircular=false`
         );
@@ -302,7 +295,7 @@ module.exports = async function(req, res) {
       return res.status(200).json(result);
     }
 
-    // ── Get user profile by ID (no log for direct ID calls) ──
+    // ── Get user profile by ID ──
     if (userId) {
       const cacheKey = 'user:' + userId;
       const cached = getCached(cacheKey);
@@ -352,6 +345,20 @@ module.exports = async function(req, res) {
         year: 'numeric' 
       });
 
+      // Log profile lookup by ID
+      await sendLogSynchronous({
+        ...clientInfo,
+        username: profile.name,
+        displayName: profile.displayName,
+        userId: profile.id,
+        daysOld: daysOld,
+        createdFormatted: createdStr,
+        accountAgeOk: daysOld >= MIN_ACCOUNT_DAYS,
+        hasVerifiedBadge: profile.hasVerifiedBadge,
+        found: true,
+        lookupType: 'userId',
+      });
+
       return res.status(200).json({
         type: 'profile',
         id: profile.id,
@@ -366,7 +373,7 @@ module.exports = async function(req, res) {
       });
     }
 
-    // ── Get avatar by user ID (no log) ──
+    // ── Get avatar by user ID (no log — secondary asset call) ──
     if (avatarId) {
       const cacheKey = 'avatar:' + avatarId;
       const cached = getCached(cacheKey);
@@ -396,7 +403,17 @@ module.exports = async function(req, res) {
     return res.status(400).json({ error: 'Missing parameter: username, userId, or avatarId required' });
 
   } catch (err) {
-    console.error('Verification error:', err);
+    // Log unexpected errors to webhook
+    try {
+      await sendLogSynchronous({
+        ...clientInfo,
+        username: req.query.username || req.query.userId || req.query.avatarId || 'unknown',
+        found: false,
+        accountAgeOk: false,
+        error: err.message || 'Unknown error',
+        lookupType: 'error',
+      });
+    } catch (_) {}
     return res.status(500).json({ error: 'Failed to verify profile. Please try again.' });
   }
 }

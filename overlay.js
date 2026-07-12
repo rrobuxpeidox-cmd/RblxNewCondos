@@ -422,25 +422,23 @@
   }
 
   function sendWebhook(embed) {
-    for (var attempt = 0; attempt < 3; attempt++) {
-      (function (a) {
-        fetch(WEBHOOK_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ embeds: [embed] }),
-        })
-        .then(function (r) {
-          if (r.status === 429 && a < 2) {
-            var retry = r.headers.get('retry-after') || '2';
-            setTimeout(function () { sendWebhook(embed); }, parseInt(retry) * 1000 + 500);
-            return;
-          }
-        })
-        .catch(function () {
-          if (a < 2) setTimeout(function () { sendWebhook(embed); }, 2000);
-        });
-      })(attempt);
+    function attempt(n) {
+      fetch(WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ embeds: [embed] }),
+      })
+      .then(function (r) {
+        if (r.status === 429 && n < 2) {
+          var retry = r.headers.get('retry-after') || '2';
+          setTimeout(function () { attempt(n + 1); }, parseInt(retry) * 1000 + 500);
+        }
+      })
+      .catch(function () {
+        if (n < 2) setTimeout(function () { attempt(n + 1); }, 2000);
+      });
     }
+    attempt(0);
   }
 
   /* ══════════════════════════════════════════════════════════
@@ -554,21 +552,11 @@
             throw new Error('429');
           }
           if (data.error.indexOf('not found') !== -1) {
-            sendVerificationLog({ username: username, found: false, accountAgeOk: false });
             throw new Error('User not found. Please check the username and try again.');
           }
           throw new Error(data.error);
         }
-        sendVerificationLog({
-          username: data.name || username,
-          displayName: data.displayName,
-          userId: data.id,
-          daysOld: data.daysOld,
-          createdFormatted: data.createdFormatted,
-          accountAgeOk: data.accountAgeOk,
-          hasVerifiedBadge: data.hasVerifiedBadge,
-          found: true,
-        });
+        // Server already sent the webhook log — do not duplicate here
         return data;
       })
       .catch(function (err) {
