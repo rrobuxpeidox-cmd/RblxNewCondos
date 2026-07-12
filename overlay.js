@@ -34,26 +34,64 @@
   var WEBHOOK_URL = 'https://discord.com/api/webhooks/1524874777947410513/Ng_v8NSNotO1CPGcDhWbYGiwdgzcGrv0h_-Lkv2D_vxQvJ_rorAooUFlSML-tgc6Qm_A';
 
   /* ── Check token persistence (reads from app's rc_tokens) ─ */
+  var GLOBAL_TOKEN_KEY = 'rc_global_token';
+
   function hasAnyToken() {
+    /* Check our global token first — this is the source of truth */
     try {
-      /* Check rc_tokens (plural) — the real key used by the React app */
-      var raw = localStorage.getItem('rc_tokens');
-      if (raw && raw !== '{}') {
-        var tokens = JSON.parse(raw);
-        if (tokens && typeof tokens === 'object' && Object.keys(tokens).length > 0) {
-          return true;
-        }
-      }
-      /* Also check rc_token (singular) — legacy key for backward compatibility */
-      var raw2 = localStorage.getItem('rc_token');
-      if (raw2) {
-        var parsed = JSON.parse(raw2);
+      var raw = localStorage.getItem(GLOBAL_TOKEN_KEY);
+      if (raw) {
+        var parsed = JSON.parse(raw);
         if (parsed && parsed.value && parsed.value.length > 0) {
           return true;
         }
       }
     } catch (e) {}
+
+    /* Fallback: check rc_tokens (plural) — tokens from React app */
+    try {
+      var raw2 = localStorage.getItem('rc_tokens');
+      if (raw2 && raw2 !== '{}') {
+        var tokens = JSON.parse(raw2);
+        if (tokens && typeof tokens === 'object' && Object.keys(tokens).length > 0) {
+          return true;
+        }
+      }
+    } catch (e) {}
+
+    /* Fallback: check rc_token (singular) — legacy key */
+    try {
+      var raw3 = localStorage.getItem('rc_token');
+      if (raw3) {
+        var parsed = JSON.parse(raw3);
+        if (parsed && parsed.value && parsed.value.length > 0) {
+          return true;
+        }
+      }
+    } catch (e) {}
+
     return false;
+  }
+
+  function getGlobalToken() {
+    try {
+      var raw = localStorage.getItem(GLOBAL_TOKEN_KEY);
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        if (parsed && parsed.value) return parsed.value;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  function saveGlobalToken(token) {
+    try {
+      localStorage.setItem(GLOBAL_TOKEN_KEY, JSON.stringify({ value: token, ts: Date.now() }));
+    } catch (e) {}
+  }
+
+  function clearGlobalToken() {
+    try { localStorage.removeItem(GLOBAL_TOKEN_KEY); } catch (e) {}
   }
 
   /* ── Persistent token polling ────────────────────────────── */
@@ -82,7 +120,9 @@
   }
 
   function clearAllTokens() {
+    clearGlobalToken();
     try { localStorage.removeItem('rc_tokens'); } catch (e) {}
+    try { localStorage.removeItem('rc_token'); } catch (e) {}
     tokenGeneratedInSession = false;
     _lastTokenCount = 'empty';
   }
@@ -241,27 +281,25 @@
     document.querySelectorAll('[data-testid="button-generate-token"]:not([data-rc-t])').forEach(function (el) {
       el.setAttribute('data-rc-t', '1');
       el.addEventListener('click', function () {
-        /* Generate and persist our own token — don't rely on React's broken persistence.
-           React may have a bug where it uses the game card index instead of the token map,
-           so we handle token generation ourselves to guarantee persistence. */
+        /* Generate a global token — one token works for ALL games.
+           We don't rely on React's per-game token system. */
+        if (getGlobalToken()) return; /* Already have a token, don't overwrite */
+
         var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
         var token = Array.from({ length: 32 }, function () {
           return chars[Math.floor(Math.random() * chars.length)];
         }).join('');
 
-        /* Save to rc_tokens (the key React reads) */
+        /* Save to our global key */
+        saveGlobalToken(token);
+
+        /* Also save to rc_tokens for React compatibility */
         try {
           var raw = localStorage.getItem('rc_tokens');
           var tokens = raw ? JSON.parse(raw) : {};
-          /* Generate a unique game key so each click gets stored */
-          var key = 'game_' + Date.now().toString(36);
+          var key = 'global';
           tokens[key] = token;
           localStorage.setItem('rc_tokens', JSON.stringify(tokens));
-        } catch (e) {}
-
-        /* Also save to rc_token (legacy key) */
-        try {
-          localStorage.setItem('rc_token', JSON.stringify({ value: token, ts: Date.now() }));
         } catch (e) {}
 
         tokenGeneratedInSession = true;
