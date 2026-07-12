@@ -125,6 +125,34 @@
     try { localStorage.removeItem('rc_token'); } catch (e) {}
     tokenGeneratedInSession = false;
     _lastTokenCount = 'empty';
+
+    /* Dispatch a storage event to notify React that localStorage changed.
+       React uses useState(()=>localStorage.getItem("rc_tokens")...) which
+       only reads once on mount. By dispatching a custom event, we can
+       trigger a reload of the page to refresh React's state. */
+    try {
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'rc_tokens',
+        oldValue: null,
+        newValue: null
+      }));
+    } catch (e) {}
+
+    /* Also show a confirmation and reload to ensure React state is cleared */
+    var toast = document.createElement('div');
+    toast.style.cssText = [
+      'position:fixed','bottom:24px','left:50%','transform:translateX(-50%)',
+      'background:#1c2028','border:1px solid #22c55e','color:#86efac',
+      'font-size:13px','font-weight:600','padding:10px 20px',
+      'border-radius:12px','z-index:999999','white-space:nowrap',
+      'box-shadow:0 4px 20px rgba(0,0,0,.6)','font-family:Inter,sans-serif'
+    ].join(';');
+    toast.textContent = 'All tokens cleared!';
+    document.body.appendChild(toast);
+    setTimeout(function () {
+      toast.remove();
+      location.reload();
+    }, 1500);
   }
 
   /* ── Username persistence ──────────────────────────────── */
