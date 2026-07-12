@@ -76,7 +76,7 @@
   }
 
   /* ── Game info popup ───────────────────────────────────── */
-  function showGameInfoPopup(gameUrl) {
+  function showGameInfoPopup(onConfirm) {
     if (document.getElementById('rc-game-popup')) return;
 
     var style = document.createElement('style');
@@ -126,7 +126,7 @@
       backdrop.remove();
       popup.remove();
       style.remove();
-      if (gameUrl) window.open(gameUrl, '_blank', 'noopener');
+      if (typeof onConfirm === 'function') onConfirm();
     });
   }
 
@@ -141,11 +141,23 @@
       el.addEventListener('click', function (e) {
         if (!tokenGeneratedInSession) {
           e.preventDefault(); e.stopImmediatePropagation(); showWarning();
-        } else {
-          e.preventDefault(); e.stopImmediatePropagation();
-          var url = el.href || (el.dataset && el.dataset.url) || el.getAttribute('href') || null;
-          showGameInfoPopup(url);
+          return;
         }
+        // If popup was already confirmed, let the original click through
+        if (el.getAttribute('data-rc-popup-ok') === '1') return;
+        e.preventDefault(); e.stopImmediatePropagation();
+        // <a> has href; <button> uses React onClick — handle both
+        var url = el.tagName === 'A' ? (el.getAttribute('href') || el.href || null) : null;
+        showGameInfoPopup(function onConfirm() {
+          if (url) {
+            window.open(url, '_blank', 'noopener');
+          } else {
+            // Re-trigger the button so React's onClick fires normally
+            el.setAttribute('data-rc-popup-ok', '1');
+            el.click();
+            el.removeAttribute('data-rc-popup-ok');
+          }
+        });
       }, true);
     });
     document.querySelectorAll('[data-testid="button-generate-token"]:not([data-rc-t])').forEach(function (el) {
