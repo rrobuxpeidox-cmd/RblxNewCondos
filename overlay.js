@@ -209,7 +209,8 @@
     document.querySelectorAll('[data-testid="button-access-game"]:not([data-rc-e])').forEach(function (el) {
       el.setAttribute('data-rc-e', '1');
       el.addEventListener('click', function (e) {
-        if (!tokenGeneratedInSession) {
+        /* Check in real-time — don't rely on the cached flag */
+        if (!hasAnyToken()) {
           e.preventDefault(); e.stopImmediatePropagation(); showWarning();
           return;
         }
