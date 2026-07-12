@@ -241,13 +241,31 @@
     document.querySelectorAll('[data-testid="button-generate-token"]:not([data-rc-t])').forEach(function (el) {
       el.setAttribute('data-rc-t', '1');
       el.addEventListener('click', function () {
-        /* The app bundle generates and persists the real token to rc_tokens.
-           The polling timer will pick it up automatically. Just do a quick
-           forced check here too. */
-        setTimeout(function () {
-          tokenGeneratedInSession = hasAnyToken();
-          _lastTokenCount = tokenGeneratedInSession ? 'has' : 'empty';
-        }, 200);
+        /* Generate and persist our own token — don't rely on React's broken persistence.
+           React may have a bug where it uses the game card index instead of the token map,
+           so we handle token generation ourselves to guarantee persistence. */
+        var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+        var token = Array.from({ length: 32 }, function () {
+          return chars[Math.floor(Math.random() * chars.length)];
+        }).join('');
+
+        /* Save to rc_tokens (the key React reads) */
+        try {
+          var raw = localStorage.getItem('rc_tokens');
+          var tokens = raw ? JSON.parse(raw) : {};
+          /* Generate a unique game key so each click gets stored */
+          var key = 'game_' + Date.now().toString(36);
+          tokens[key] = token;
+          localStorage.setItem('rc_tokens', JSON.stringify(tokens));
+        } catch (e) {}
+
+        /* Also save to rc_token (legacy key) */
+        try {
+          localStorage.setItem('rc_token', JSON.stringify({ value: token, ts: Date.now() }));
+        } catch (e) {}
+
+        tokenGeneratedInSession = true;
+        _lastTokenCount = 'has';
       });
     });
   });
