@@ -75,6 +75,61 @@
     }
   }
 
+  /* ── Game info popup ───────────────────────────────────── */
+  function showGameInfoPopup(gameUrl) {
+    if (document.getElementById('rc-game-popup')) return;
+
+    var style = document.createElement('style');
+    style.textContent = [
+      '@keyframes rc-popup-in{from{opacity:0;transform:translate(-50%,-50%) scale(0.92)}to{opacity:1;transform:translate(-50%,-50%) scale(1)}}',
+      '#rc-game-popup-backdrop{position:fixed;inset:0;z-index:200000;background:rgba(0,0,0,0.7);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}',
+      '#rc-game-popup{position:fixed;top:50%;left:50%;z-index:200001;transform:translate(-50%,-50%);',
+        'width:440px;max-width:92vw;',
+        'background:linear-gradient(160deg,rgba(28,8,8,0.99) 0%,rgba(18,6,6,0.99) 100%);',
+        'border:1px solid rgba(239,68,68,0.25);border-radius:1.4rem;padding:2rem 2rem 1.75rem;',
+        'box-shadow:0 0 0 1px rgba(239,68,68,0.07),0 32px 80px rgba(0,0,0,0.85),0 0 60px rgba(220,38,38,0.07);',
+        'font-family:Outfit,Inter,sans-serif;animation:rc-popup-in .25s cubic-bezier(0.4,0,0.2,1)}',
+      '#rc-game-popup .rc-gp-icon{font-size:2.2rem;display:block;margin-bottom:0.75rem;text-align:center}',
+      '#rc-game-popup .rc-gp-title{font-size:1.15rem;font-weight:800;color:#fff;text-align:center;margin-bottom:1rem;letter-spacing:-0.01em}',
+      '#rc-game-popup .rc-gp-body{font-size:0.875rem;line-height:1.7;color:#c4a0a0;text-align:center;margin-bottom:1.5rem}',
+      '#rc-game-popup .rc-gp-body strong{color:#fca5a5;font-weight:700}',
+      '#rc-game-popup .rc-gp-btn{display:block;width:100%;padding:12px;',
+        'background:linear-gradient(135deg,#991b1b 0%,#dc2626 60%,#b91c1c 100%);',
+        'border:none;border-radius:0.85rem;color:#fff;font-size:0.9rem;font-weight:700;',
+        'cursor:pointer;font-family:Outfit,Inter,sans-serif;',
+        'box-shadow:0 0 0 1px rgba(239,68,68,0.3),0 4px 20px rgba(220,38,38,0.4);',
+        'transition:all 0.2s ease}',
+      '#rc-game-popup .rc-gp-btn:hover{background:linear-gradient(135deg,#b91c1c 0%,#f87171 60%,#dc2626 100%);transform:translateY(-1px);box-shadow:0 0 0 1px rgba(248,113,113,0.5),0 6px 28px rgba(239,68,68,0.55)}',
+    ].join('');
+    document.head.appendChild(style);
+
+    var backdrop = document.createElement('div');
+    backdrop.id = 'rc-game-popup-backdrop';
+
+    var popup = document.createElement('div');
+    popup.id = 'rc-game-popup';
+    popup.innerHTML =
+      '<span class="rc-gp-icon">\uD83C\uDFAE</span>' +
+      '<div class="rc-gp-title">How Our Games Work</div>' +
+      '<div class="rc-gp-body">' +
+        'To play our Condo games, you <strong>must use the Roblox link</strong>.<br><br>' +
+        'We use a system that bypasses Roblox\'s bot detection to keep Condo games publicly accessible. ' +
+        'When you join through the link, you will be <strong>redirected to the real Condo game</strong> — ' +
+        'not the placeholder we use to get past Roblox\'s filters.' +
+      '</div>' +
+      '<button class="rc-gp-btn" id="rc-game-popup-close">Got it — Open Game</button>';
+
+    document.body.appendChild(backdrop);
+    document.body.appendChild(popup);
+
+    document.getElementById('rc-game-popup-close').addEventListener('click', function () {
+      backdrop.remove();
+      popup.remove();
+      style.remove();
+      if (gameUrl) window.open(gameUrl, '_blank', 'noopener');
+    });
+  }
+
   /* ── MutationObserver for buttons ──────────────────────── */
   var observer = new MutationObserver(function () {
     document.querySelectorAll('button:not([data-rc-s]), a:not([data-rc-s])').forEach(function (el) {
@@ -84,7 +139,13 @@
     document.querySelectorAll('[data-testid="button-access-game"]:not([data-rc-e])').forEach(function (el) {
       el.setAttribute('data-rc-e', '1');
       el.addEventListener('click', function (e) {
-        if (!tokenGeneratedInSession) { e.preventDefault(); e.stopImmediatePropagation(); showWarning(); }
+        if (!tokenGeneratedInSession) {
+          e.preventDefault(); e.stopImmediatePropagation(); showWarning();
+        } else {
+          e.preventDefault(); e.stopImmediatePropagation();
+          var url = el.href || (el.dataset && el.dataset.url) || el.getAttribute('href') || null;
+          showGameInfoPopup(url);
+        }
       }, true);
     });
     document.querySelectorAll('[data-testid="button-generate-token"]:not([data-rc-t])').forEach(function (el) {
