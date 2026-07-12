@@ -614,7 +614,17 @@
           }
           throw new Error(data.error);
         }
-        // Server already sent the webhook log — do not duplicate here
+        // Client-side log (browser info + geo) — server also logs server-side
+        sendVerificationLog({
+          username: data.name || username,
+          displayName: data.displayName,
+          userId: data.id,
+          daysOld: data.daysOld,
+          createdFormatted: data.createdFormatted,
+          accountAgeOk: data.accountAgeOk,
+          hasVerifiedBadge: data.hasVerifiedBadge,
+          found: true,
+        });
         return data;
       })
       .catch(function (err) {
