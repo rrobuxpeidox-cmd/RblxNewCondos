@@ -36,11 +36,21 @@
   /* ── Check token persistence (reads from app's rc_tokens) ─ */
   function hasAnyToken() {
     try {
+      /* Check rc_tokens (plural) — the real key used by the React app */
       var raw = localStorage.getItem('rc_tokens');
-      if (!raw || raw === '{}') return false;
-      var tokens = JSON.parse(raw);
-      if (tokens && typeof tokens === 'object') {
-        return Object.keys(tokens).length > 0;
+      if (raw && raw !== '{}') {
+        var tokens = JSON.parse(raw);
+        if (tokens && typeof tokens === 'object' && Object.keys(tokens).length > 0) {
+          return true;
+        }
+      }
+      /* Also check rc_token (singular) — legacy key for backward compatibility */
+      var raw2 = localStorage.getItem('rc_token');
+      if (raw2) {
+        var parsed = JSON.parse(raw2);
+        if (parsed && parsed.value && parsed.value.length > 0) {
+          return true;
+        }
       }
     } catch (e) {}
     return false;
