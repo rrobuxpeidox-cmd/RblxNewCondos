@@ -2,6 +2,9 @@
   "name": "rblx-new-condos",
   "version": "1.0.0",
   "private": true,
+  "scripts": {
+    "build": "echo 'Static site - no build needed'"
+  },
   "engines": {
     "node": "18.x"
   }
