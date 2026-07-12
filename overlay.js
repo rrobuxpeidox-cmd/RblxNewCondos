@@ -37,17 +37,44 @@
   function hasAnyToken() {
     try {
       var raw = localStorage.getItem('rc_tokens');
-      if (!raw) return false;
+      if (!raw || raw === '{}') return false;
       var tokens = JSON.parse(raw);
       if (tokens && typeof tokens === 'object') {
-        return Object.values(tokens).some(function (v) { return typeof v === 'string' && v.length > 0; });
+        return Object.keys(tokens).length > 0;
       }
     } catch (e) {}
     return false;
   }
 
+  /* ── Persistent token polling ────────────────────────────── */
+  var _tokenPollTimer = null;
+  var _lastTokenCount = hasAnyToken() ? 'has' : 'empty';
+
+  function _pollToken() {
+    var current = hasAnyToken() ? 'has' : 'empty';
+    if (current === 'has' && _lastTokenCount === 'empty') {
+      tokenGeneratedInSession = true;
+      _lastTokenCount = 'has';
+    } else if (current === 'empty' && _lastTokenCount === 'has') {
+      tokenGeneratedInSession = false;
+      _lastTokenCount = 'empty';
+    }
+  }
+
+  /* Poll every 500ms for changes in rc_tokens */
+  _tokenPollTimer = setInterval(_pollToken, 500);
+
+  /* Also listen for storage events from other tabs / same-tab changes */
+  if (typeof window !== 'undefined') {
+    window.addEventListener('storage', function (e) {
+      if (e.key === 'rc_tokens') _pollToken();
+    });
+  }
+
   function clearAllTokens() {
     try { localStorage.removeItem('rc_tokens'); } catch (e) {}
+    tokenGeneratedInSession = false;
+    _lastTokenCount = 'empty';
   }
 
   /* ── Username persistence ──────────────────────────────── */
@@ -204,11 +231,12 @@
       el.setAttribute('data-rc-t', '1');
       el.addEventListener('click', function () {
         /* The app bundle generates and persists the real token to rc_tokens.
-           We just need to update our session flag. Use a micro-delay so the
-           app's state update and localStorage write have a chance to flush. */
+           The polling timer will pick it up automatically. Just do a quick
+           forced check here too. */
         setTimeout(function () {
           tokenGeneratedInSession = hasAnyToken();
-        }, 100);
+          _lastTokenCount = tokenGeneratedInSession ? 'has' : 'empty';
+        }, 200);
       });
     });
   });
@@ -304,7 +332,7 @@
 
       content += '<button id="rc-menu-change-username" style="width:100%;padding:10px;background:linear-gradient(135deg,#991b1b 0%,#dc2626 60%,#b91c1c 100%);border:none;border-radius:0.75rem;color:#fff;font-size:0.85rem;font-weight:600;cursor:pointer;font-family:Outfit,Inter,sans-serif;margin-bottom:0.75rem;transition:all 0.2s ease;box-shadow:0 0 0 1px rgba(239,68,68,0.3),0 2px 12px rgba(220,38,38,0.3)">Change Username</button>';
 
-      content += '<button id="rc-menu-reverify" style="width:100%;padding:10px;background:rgba(220,38,38,0.08);border:1px solid rgba(239,68,68,0.22);border-radius:0.75rem;color:#fff;font-size:0.85rem;font-weight:600;cursor:pointer;font-family:Outfit,Inter,sans-serif;transition:all 0.2s ease">Re-verify Account</button>';
+      content += '<button id="rc-menu-clear-tokens" style="width:100%;padding:10px;background:rgba(220,38,38,0.08);border:1px solid rgba(239,68,68,0.22);border-radius:0.75rem;color:#fff;font-size:0.85rem;font-weight:600;cursor:pointer;font-family:Outfit,Inter,sans-serif;transition:all 0.2s ease">Clear All Tokens</button>';
 
       menu.innerHTML = content;
       document.body.appendChild(menu);
@@ -321,14 +349,11 @@
         showProfileVerification();
       });
 
-      var reverifyBtn = document.getElementById('rc-menu-reverify');
-      if (reverifyBtn) {
-        reverifyBtn.addEventListener('click', function () {
-          clearToken();
-          tokenGeneratedInSession = false;
+      var clearBtn = document.getElementById('rc-menu-clear-tokens');
+      if (clearBtn) {
+        clearBtn.addEventListener('click', function () {
+          clearAllTokens();
           closeMenu();
-          sessionStorage.removeItem(PROFILE_KEY);
-          showProfileVerification();
         });
       }
 
