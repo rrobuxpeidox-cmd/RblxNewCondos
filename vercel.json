@@ -5,6 +5,13 @@
   ],
   "headers": [
     {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "Accept-CH", "value": "Sec-CH-UA-Platform-Version, Sec-CH-UA-Model, Sec-CH-UA-Platform" },
+        { "key": "Permissions-Policy", "value": "ch-ua-platform-version=(*), ch-ua-model=(*), ch-ua-platform=(*)" }
+      ]
+    },
+    {
       "source": "/overlay.js",
       "headers": [
         { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }

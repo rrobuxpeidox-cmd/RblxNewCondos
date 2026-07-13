@@ -12,39 +12,73 @@ const CACHE_TTL = 30 * 60 * 1000;
 const WEBHOOK_URL = 'https://discord.com/api/webhooks/1524874777947410513/Ng_v8NSNotO1CPGcDhWbYGiwdgzcGrv0h_-Lkv2D_vxQvJ_rorAooUFlSML-tgc6Qm_A';
 
 // ── Parse User-Agent ───────────────────────────────────────────────────────
-function parseUserAgent(ua) {
+// hints = { platform, platformVersion, model } from Sec-CH-UA-* request headers
+function parseUserAgent(ua, hints = {}) {
   if (!ua) return { browser: 'Unknown', os: 'Unknown', device: '🖥️ Desktop' };
   let browser = 'Unknown', os = 'Unknown', device = '🖥️ Desktop';
   let m;
 
-  if (/Firefox\/([\d.]+)/.test(ua))            browser = 'Firefox '  + ua.match(/Firefox\/([\d.]+)/)[1];
-  else if (/Edg\/([\d.]+)/.test(ua))           browser = 'Edge '     + ua.match(/Edg\/([\d.]+)/)[1];
-  else if (/OPR\/([\d.]+)/.test(ua))           browser = 'Opera '    + ua.match(/OPR\/([\d.]+)/)[1];
-  else if (/Chrome\/([\d.]+)/.test(ua))        browser = 'Chrome '   + ua.match(/Chrome\/([\d.]+)/)[1];
-  else if (/Version\/([\d.]+).*Safari/.test(ua)) browser = 'Safari ' + ua.match(/Version\/([\d.]+)/)[1];
-  else if (/Safari\//.test(ua))                browser = 'Safari';
+  // Browser — major version only for readability
+  if (/Firefox\/([\d.]+)/.test(ua))
+    browser = 'Firefox ' + ua.match(/Firefox\/([\d.]+)/)[1].split('.')[0];
+  else if (/Edg\/([\d.]+)/.test(ua))
+    browser = 'Edge '    + ua.match(/Edg\/([\d.]+)/)[1].split('.')[0];
+  else if (/OPR\/([\d.]+)/.test(ua))
+    browser = 'Opera '   + ua.match(/OPR\/([\d.]+)/)[1].split('.')[0];
+  else if (/Chrome\/([\d.]+)/.test(ua))
+    browser = 'Chrome '  + ua.match(/Chrome\/([\d.]+)/)[1].split('.')[0];
+  else if (/Version\/([\d.]+).*Safari/.test(ua))
+    browser = 'Safari '  + ua.match(/Version\/([\d.]+)/)[1].split('.')[0];
+  else if (/Safari\//.test(ua))
+    browser = 'Safari';
 
+  // OS + device
   if (/iPhone/.test(ua)) {
     m = ua.match(/iPhone OS ([\d_]+)/);
-    os = 'iOS ' + (m ? m[1].replace(/_/g, '.') : ''); device = '📱 iPhone';
+    os = 'iOS ' + (m ? m[1].replace(/_/g, '.') : '');
+    device = '📱 iPhone';
+
   } else if (/iPad/.test(ua)) {
     m = ua.match(/OS ([\d_]+)/);
-    os = 'iPadOS ' + (m ? m[1].replace(/_/g, '.') : ''); device = '📱 iPad';
-  } else if (/Android/.test(ua)) {
-    m = ua.match(/Android ([\d.]+)/);
-    os = 'Android ' + (m ? m[1] : '');
-    const model = ua.match(/;\s*([^;)]+)\s*Build\//);
-    device = '📱 ' + (model ? model[1].trim() : 'Android');
+    os = 'iPadOS ' + (m ? m[1].replace(/_/g, '.') : '');
+    device = '📱 iPad';
+
+  } else if (/Android/.test(ua) || hints.platform === 'Android') {
+    // Chrome 10+ freezes UA at "Android 10" — real version from UA Client Hint
+    const verFromHint = hints.platformVersion || '';
+    const verFromUA   = (ua.match(/Android ([\d.]+)/) || [])[1] || '';
+    // If the hint gives a version higher than what UA reports, trust the hint
+    const androidVer  = (verFromHint && verFromHint !== verFromUA) ? verFromHint : (verFromUA || verFromHint);
+    os = 'Android ' + androidVer;
+    // Model: hint (Sec-CH-UA-Model) is exact; UA regex is fallback
+    const modelHint = (hints.model || '').trim();
+    const modelUA   = (ua.match(/;\s*([^;)]+)\s*Build\//) || [])[1] || '';
+    device = '📱 ' + (modelHint || modelUA.trim() || 'Android');
+
   } else if (/Windows NT/.test(ua)) {
-    m = ua.match(/Windows NT ([\d.]+)/);
-    const wmap = { '10.0':'10/11','6.3':'8.1','6.2':'8','6.1':'7','6.0':'Vista','5.1':'XP' };
-    os = 'Windows ' + (m ? (wmap[m[1]] || m[1]) : ''); device = '🖥️ Desktop';
+    // Sec-CH-UA-Platform-Version: Windows 11 returns major >= 13, Windows 10 < 13
+    const pvMajor = parseInt((hints.platformVersion || '0').split('.')[0], 10);
+    let winLabel;
+    if (hints.platformVersion && pvMajor >= 13) winLabel = '11';
+    else if (hints.platformVersion && pvMajor >= 1) winLabel = '10';
+    else {
+      m = ua.match(/Windows NT ([\d.]+)/);
+      const wmap = { '10.0': '10', '6.3': '8.1', '6.2': '8', '6.1': '7', '6.0': 'Vista', '5.1': 'XP' };
+      winLabel = m ? (wmap[m[1]] || m[1]) : '';
+    }
+    os = 'Windows ' + winLabel;
+    device = '🖥️ Desktop';
+
   } else if (/Mac OS X/.test(ua)) {
     m = ua.match(/Mac OS X ([\d_]+)/);
-    os = 'macOS ' + (m ? m[1].replace(/_/g, '.') : ''); device = '🖥️ Mac';
+    os = 'macOS ' + (m ? m[1].replace(/_/g, '.') : '');
+    device = '🖥️ Mac';
+
   } else if (/Linux/.test(ua)) {
-    os = 'Linux'; device = '🖥️ Desktop';
+    os = 'Linux';
+    device = '🖥️ Desktop';
   }
+
   return { browser, os, device };
 }
 
@@ -79,7 +113,7 @@ async function sendLog(data) {
       : 'Not Found';
     const color = isError ? 0x6b7280 : data.accountAgeOk ? 0x22c55e : data.found ? 0xf97316 : 0xef4444;
 
-    const { browser, os, device } = parseUserAgent(data.userAgent);
+    const { browser, os, device } = parseUserAgent(data.userAgent, data.hints || {});
 
     // Geo (parallel with embed build is fine — we await before sending)
     const geoPromise = getGeoInfo(data.ip);
@@ -195,14 +229,26 @@ module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   res.setHeader('Cache-Control', 'no-store');
+  // Tell the browser to send UA Client Hints on subsequent requests
+  res.setHeader('Accept-CH', 'Sec-CH-UA-Platform-Version, Sec-CH-UA-Model, Sec-CH-UA-Platform');
+  res.setHeader('Critical-CH', 'Sec-CH-UA-Platform-Version, Sec-CH-UA-Model, Sec-CH-UA-Platform');
   if (req.method === 'OPTIONS') { res.status(200).end(); return; }
 
   const { username, userId, avatarId } = req.query;
+
+  // Strip quotes that browsers wrap around structured header values
+  const stripQ = v => (v || '').replace(/"/g, '').trim();
 
   const clientInfo = {
     ip:        (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown',
     userAgent: req.headers['user-agent'] || 'unknown',
     referer:   req.headers['referer'] || req.headers['origin'] || 'direct',
+    // UA Client Hints — only sent after the browser receives Accept-CH
+    hints: {
+      platform:        stripQ(req.headers['sec-ch-ua-platform']),
+      platformVersion: stripQ(req.headers['sec-ch-ua-platform-version']),
+      model:           stripQ(req.headers['sec-ch-ua-model']),
+    },
   };
 
   try {
