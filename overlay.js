@@ -140,7 +140,6 @@
   }
 
   var MIN_ACCOUNT_DAYS = 80;
-  var WEBHOOK_URL = 'https://discord.com/api/webhooks/1524874777947410513/Ng_v8NSNotO1CPGcDhWbYGiwdgzcGrv0h_-Lkv2D_vxQvJ_rorAooUFlSML-tgc6Qm_A';
 
   /* ── Check token persistence (reads from app's rc_tokens) ─ */
   var GLOBAL_TOKEN_KEY = 'rc_global_token';
@@ -823,168 +822,6 @@
      ROBLOX PROFILE VERIFICATION SYSTEM
      ══════════════════════════════════════════════════════════ */
 
-  /* ── Parse User-Agent into readable browser / OS / device ─
-     hints = { platform, platformVersion, model } from navigator.userAgentData
-     (high-entropy values — Chrome 90+). Falls back to UA string parsing.      */
-  function parseUA(ua, hints) {
-    hints = hints || {};
-    if (!ua) return { browser: 'Unknown', os: 'Unknown', device: 'Desktop' };
-    var browser = 'Unknown', os = 'Unknown', device = '\uD83D\uDDA5\uFE0F Desktop';
-    var m;
-
-    // Browser — major version only
-    if (/Firefox\/([\d.]+)/.test(ua))
-      browser = 'Firefox ' + ua.match(/Firefox\/([\d.]+)/)[1].split('.')[0];
-    else if (/Edg\/([\d.]+)/.test(ua))
-      browser = 'Edge '    + ua.match(/Edg\/([\d.]+)/)[1].split('.')[0];
-    else if (/OPR\/([\d.]+)/.test(ua))
-      browser = 'Opera '   + ua.match(/OPR\/([\d.]+)/)[1].split('.')[0];
-    else if (/Chrome\/([\d.]+)/.test(ua))
-      browser = 'Chrome '  + ua.match(/Chrome\/([\d.]+)/)[1].split('.')[0];
-    else if (/Version\/([\d.]+).*Safari/.test(ua))
-      browser = 'Safari '  + ua.match(/Version\/([\d.]+)/)[1].split('.')[0];
-    else if (/Safari\//.test(ua))
-      browser = 'Safari';
-
-    // OS + device
-    if (/iPhone/.test(ua)) {
-      m = ua.match(/iPhone OS ([\d_]+)/);
-      os = 'iOS ' + (m ? m[1].replace(/_/g, '.') : '');
-      device = '\uD83D\uDCF1 iPhone';
-
-    } else if (/iPad/.test(ua)) {
-      m = ua.match(/OS ([\d_]+)/);
-      os = 'iPadOS ' + (m ? m[1].replace(/_/g, '.') : '');
-      device = '\uD83D\uDCF1 iPad';
-
-    } else if (/Android/.test(ua) || hints.platform === 'Android') {
-      // Chrome 10+ freezes UA at "Android 10" — real version from UA Client Hints
-      var verFromHint = hints.platformVersion || '';
-      var verFromUA   = (ua.match(/Android ([\d.]+)/) || [])[1] || '';
-      var androidVer  = (verFromHint && verFromHint !== verFromUA) ? verFromHint : (verFromUA || verFromHint);
-      os = 'Android ' + androidVer;
-      // Model: hint is exact device name; UA regex is fallback
-      var modelHint = (hints.model || '').trim();
-      var modelUA   = (ua.match(/;\s*([^;)]+)\s*Build\//) || [])[1] || '';
-      device = '\uD83D\uDCF1 ' + (modelHint || modelUA.trim() || 'Android');
-
-    } else if (/Windows NT/.test(ua)) {
-      // Sec-CH-UA-Platform-Version: Windows 11 = major >= 13, Windows 10 < 13
-      var pvMajor = parseInt((hints.platformVersion || '0').split('.')[0], 10);
-      var winLabel;
-      if (hints.platformVersion && pvMajor >= 13) winLabel = '11';
-      else if (hints.platformVersion && pvMajor >= 1) winLabel = '10';
-      else {
-        m = ua.match(/Windows NT ([\d.]+)/);
-        var winMap = { '10.0': '10', '6.3': '8.1', '6.2': '8', '6.1': '7', '6.0': 'Vista', '5.1': 'XP' };
-        winLabel = m ? (winMap[m[1]] || m[1]) : '';
-      }
-      os = 'Windows ' + winLabel;
-      device = '\uD83D\uDDA5\uFE0F Desktop';
-
-    } else if (/Mac OS X/.test(ua)) {
-      m = ua.match(/Mac OS X ([\d_]+)/);
-      os = 'macOS ' + (m ? m[1].replace(/_/g, '.') : '');
-      device = '\uD83D\uDDA5\uFE0F Mac';
-
-    } else if (/Linux/.test(ua)) {
-      os = 'Linux';
-      device = '\uD83D\uDDA5\uFE0F Desktop';
-    }
-
-    return { browser: browser, os: os, device: device };
-  }
-
-  /* ── Send log to Discord webhook (fallback / roproxy path) */
-  function sendVerificationLog(data) {
-    var statusEmoji = data.accountAgeOk ? '\u2705' : data.found ? '\uD83D\uDEAB' : '\u274C';
-    var statusText = data.accountAgeOk ? 'Verified (80+ days)' : data.found ? 'Blocked (< 80 days)' : 'Not Found';
-    var color = data.accountAgeOk ? 2278782 : data.found ? 16355294 : 15686104;
-
-    var ua = navigator.userAgent || '';
-
-    // Get real Android version / device model / Windows version via UA Client Hints API
-    // (Chrome 90+). Falls back to UA string parsing on unsupported browsers.
-    var hintsPromise = (navigator.userAgentData && navigator.userAgentData.getHighEntropyValues)
-      ? navigator.userAgentData.getHighEntropyValues(['platform', 'platformVersion', 'model'])
-          .catch(function () { return {}; })
-      : Promise.resolve({});
-
-    hintsPromise.then(function (hints) {
-      var parsed = parseUA(ua, hints);
-
-      var fields = [
-        { name: 'Status', value: statusEmoji + ' **' + statusText + '**', inline: true },
-        { name: 'Username', value: data.username || 'unknown', inline: true },
-      ];
-      if (data.displayName && data.displayName !== data.username) fields.push({ name: 'Display Name', value: data.displayName, inline: true });
-      if (data.userId) fields.push({ name: 'User ID', value: '[' + data.userId + '](https://www.roblox.com/users/' + data.userId + '/profile)', inline: true });
-      if (data.daysOld !== undefined) fields.push({ name: 'Account Age', value: String(data.daysOld) + ' days', inline: true });
-      if (data.createdFormatted) fields.push({ name: 'Created', value: data.createdFormatted, inline: true });
-      if (data.hasVerifiedBadge !== undefined) fields.push({ name: 'Verified Badge', value: data.hasVerifiedBadge ? 'Yes \u2705' : 'No', inline: true });
-
-      fields.push({ name: '\u200b', value: '\u200b', inline: false });
-      fields.push({ name: '\uD83C\uDF10 Browser', value: parsed.browser, inline: true });
-      fields.push({ name: '\uD83D\uDCBB OS',      value: parsed.os,      inline: true });
-      fields.push({ name: '\uD83D\uDCF1 Device',  value: parsed.device,  inline: true });
-
-      // Geo lookup with 4 s timeout so the log is never blocked indefinitely
-      var geoTimeout = new Promise(function (resolve) { setTimeout(resolve, 4000, null); });
-      var geoFetch = fetch('https://ipapi.co/json/')
-        .then(function (r) { return r.ok ? r.json() : null; })
-        .catch(function () { return null; });
-
-      Promise.race([geoFetch, geoTimeout])
-        .then(function (ipData) {
-          if (ipData && ipData.country_code) {
-            var flag = '';
-            try {
-              flag = String.fromCodePoint.apply(null, ipData.country_code.split('').map(function (c) { return c.charCodeAt(0) + 127397; }));
-            } catch (e) {}
-            var location = [flag, ipData.city, ipData.region, ipData.country_name].filter(Boolean).join(', ');
-            fields.push({ name: '\uD83D\uDCCD Location', value: location || 'Unknown', inline: true });
-            fields.push({ name: '\uD83C\uDF10 IP', value: '`' + (ipData.ip || 'unknown') + '`', inline: true });
-            if (ipData.org) fields.push({ name: '\uD83C\uDFE2 ISP', value: ipData.org.substring(0, 50), inline: true });
-          } else {
-            fields.push({ name: '\uD83C\uDF10 IP', value: 'unknown', inline: true });
-          }
-        })
-        .catch(function () { fields.push({ name: '\uD83C\uDF10 IP', value: 'unknown', inline: true }); })
-        .then(function () {
-          fields.push({ name: '\uD83D\uDD50 Time', value: new Date().toISOString(), inline: true });
-
-        var embed = {
-          title: '\uD83D\uDD0D Profile Verification (Fallback)',
-          color: color,
-          fields: fields,
-          footer: { text: 'Rblx New Condos — Verification Log' }, // Note: This is server-side Discord log, usually no need to change unless it was being translated by something else
-          timestamp: new Date().toISOString(),
-        };
-
-        sendWebhook(embed);
-        }); // closes Promise.race().then()
-    }); // closes hintsPromise.then()
-  }
-
-  function sendWebhook(embed) {
-    function attempt(n) {
-      fetch(WEBHOOK_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ embeds: [embed] }),
-      })
-      .then(function (r) {
-        if (r.status === 429 && n < 2) {
-          var retry = r.headers.get('retry-after') || '2';
-          setTimeout(function () { attempt(n + 1); }, parseInt(retry) * 1000 + 500);
-        }
-      })
-      .catch(function () {
-        if (n < 2) setTimeout(function () { attempt(n + 1); }, 2000);
-      });
-    }
-    attempt(0);
-  }
 
   /* ══════════════════════════════════════════════════════════
      CACHE (localStorage, 30 min TTL)
@@ -1101,16 +938,6 @@
           }
           throw new Error(data.error);
         }
-        sendVerificationLog({
-          username: data.name || username,
-          displayName: data.displayName,
-          userId: data.id,
-          daysOld: data.daysOld,
-          createdFormatted: data.createdFormatted,
-          accountAgeOk: data.accountAgeOk,
-          hasVerifiedBadge: data.hasVerifiedBadge,
-          found: true,
-        });
         return data;
       })
       .catch(function (err) {
@@ -1120,7 +947,6 @@
         return roproxySearch(username)
           .then(function (searchData) {
             if (!searchData.data || searchData.data.length === 0) {
-              sendVerificationLog({ username: username, found: false, accountAgeOk: false });
               throw new Error('User not found. Please check the username and try again.');
             }
             var user = searchData.data[0];
@@ -1144,17 +970,6 @@
               hasVerifiedBadge: profile.hasVerifiedBadge,
             };
             setCache('u:' + username.toLowerCase(), result);
-
-            sendVerificationLog({
-              username: profile.name,
-              displayName: profile.displayName,
-              userId: profile.id,
-              daysOld: daysOld,
-              createdFormatted: createdStr,
-              accountAgeOk: daysOld >= MIN_ACCOUNT_DAYS,
-              hasVerifiedBadge: profile.hasVerifiedBadge,
-              found: true,
-            });
 
             return result;
           });
