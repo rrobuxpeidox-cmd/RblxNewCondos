@@ -1,8 +1,8 @@
 
 /**
- * Vercel Serverless Function: Google Translate Integration
+ * Vercel Serverless Function: Google Translate Integration (CommonJS)
  */
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -23,14 +23,10 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Usando a API gratuita/pública do Google Translate (pode ter limites)
-    // Para produção robusta, recomenda-se usar Google Cloud Translation API com chave
     const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${target}&dt=t&q=${encodeURIComponent(text)}`;
     
     const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error('Translation API error');
-    }
+    if (!response.ok) throw new Error('Translation API error');
 
     const data = await response.json();
     const translatedText = data[0].map(item => item[0]).join('');
@@ -39,4 +35,4 @@ export default async function handler(req, res) {
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }
-}
+};

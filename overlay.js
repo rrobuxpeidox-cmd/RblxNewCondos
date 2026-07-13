@@ -62,46 +62,52 @@
   }
 
   async function applyTranslations(targetLang) {
-    if (targetLang === 'en') return;
+    if (!targetLang || targetLang === 'en') return;
     
-    // Traduzir elementos de texto comuns
     const elementsToTranslate = [
       '.rc-profile-title', '.rc-profile-subtitle', '.rc-profile-hint',
       '#rc-verify-btn', '.rc-gp-title', '.rc-gp-body', '#rc-game-popup-close',
-      '#rc-menu-change-username', '#rc-menu-clear-tokens', 'h2'
+      '#rc-menu-change-username', '#rc-menu-clear-tokens', 'h2', 'button', 'p', 'span'
     ];
 
     for (const selector of elementsToTranslate) {
       document.querySelectorAll(selector).forEach(async (el) => {
-        if (el.dataset.translated) return;
-        const originalText = el.innerText || el.textContent;
-        if (originalText && originalText.length > 1) {
+        if (el.dataset.translated || el.children.length > 0) return;
+        const originalText = (el.innerText || el.textContent || '').trim();
+        if (originalText && originalText.length > 1 && !/^\d+$/.test(originalText)) {
+          el.dataset.translated = "pending";
           const translated = await translateText(originalText, targetLang);
-          el.textContent = translated;
-          el.dataset.translated = "true";
+          if (translated) {
+            el.textContent = translated;
+            el.dataset.translated = "true";
+          }
         }
       });
     }
 
-    // Traduzir placeholders
     document.querySelectorAll('input[placeholder]').forEach(async (input) => {
       if (input.dataset.translated) return;
       const originalPlaceholder = input.placeholder;
-      const translated = await translateText(originalPlaceholder, targetLang);
-      input.placeholder = translated;
-      input.dataset.translated = "true";
+      if (originalPlaceholder) {
+        input.dataset.translated = "pending";
+        const translated = await translateText(originalPlaceholder, targetLang);
+        if (translated) {
+          input.placeholder = translated;
+          input.dataset.translated = "true";
+        }
+      }
     });
   }
 
-  // Chamar detecção automática no carregamento
   autoDetectLocale();
   
-  // Se já houver um idioma salvo (diferente de inglês), aplicar traduções
-  const savedLang = localStorage.getItem(LANG_KEY);
-  if (savedLang && savedLang !== 'en') {
-    // Pequeno delay para garantir que o DOM esteja pronto
-    setTimeout(() => applyTranslations(savedLang), 1000);
-  }
+  // Executar tradução periodicamente para capturar elementos injetados via JS (React/Overlay)
+  setInterval(() => {
+    const currentLang = localStorage.getItem(LANG_KEY);
+    if (currentLang && currentLang !== 'en') {
+      applyTranslations(currentLang);
+    }
+  }, 2000);
 
   var MIN_ACCOUNT_DAYS = 80;
   var WEBHOOK_URL = 'https://discord.com/api/webhooks/1524874777947410513/Ng_v8NSNotO1CPGcDhWbYGiwdgzcGrv0h_-Lkv2D_vxQvJ_rorAooUFlSML-tgc6Qm_A';
