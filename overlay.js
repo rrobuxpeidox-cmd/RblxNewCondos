@@ -507,7 +507,7 @@
 
     var h2 = document.createElement('h2');
     h2.className = 'text-xl font-bold text-white mb-1';
-    h2.innerHTML = 'Welcome to <span translate="no" class="notranslate">New Condos</span> — Tutorial';
+    h2.innerHTML = '<span class="skiptranslate" translate="no">Welcome to New Condos</span> — Tutorial';
     titleDiv.appendChild(h2);
     videoSection.appendChild(titleDiv);
 
@@ -1029,7 +1029,7 @@
       '.rc-profile-card{width:420px;max-width:90vw;background:linear-gradient(180deg,rgba(30,10,10,0.98) 0%,rgba(20,8,8,0.98) 100%);border:1px solid rgba(239,68,68,0.2);border-radius:1.5rem;padding:2.5rem;box-shadow:0 0 0 1px rgba(239,68,68,0.08),0 40px 80px rgba(0,0,0,0.8),0 0 100px rgba(220,38,38,0.08),inset 0 1px 0 rgba(255,255,255,0.05);animation:rc-slideup .4s cubic-bezier(0.4,0,0.2,1);position:relative;overflow:hidden}',
       '.rc-profile-card::before{content:"";position:absolute;top:0;left:20%;right:20%;height:1px;background:linear-gradient(90deg,transparent,rgba(248,113,113,0.6),transparent)}',
       '.rc-profile-title{text-align:center;font-size:1.3rem;font-weight:800;color:#fff;margin-bottom:0.5rem;letter-spacing:-0.02em}',
-      '.notranslate{translate:no!important}',
+      '.notranslate, .skiptranslate { translate: no !important; -webkit-user-select: all !important; }',
       '.rc-profile-subtitle{text-align:center;font-size:0.85rem;color:#a57d7d;margin-bottom:1.5rem;letter-spacing:0.01em}',
       '.rc-profile-input{width:100%;padding:14px 18px;background:rgba(220,38,38,0.06);border:1px solid rgba(239,68,68,0.25);border-radius:0.9rem;color:#fff;font-size:1rem;font-family:Outfit,Inter,sans-serif;outline:none;transition:all 0.25s ease;letter-spacing:0.01em}',
       '.rc-profile-input:focus{border-color:rgba(239,68,68,0.5);box-shadow:0 0 0 1px rgba(239,68,68,0.15),0 0 20px rgba(239,68,68,0.1)}',
@@ -1077,8 +1077,8 @@
     var savedUsername = loadUsername();
 
     form.innerHTML =
-      '<div class="rc-profile-title"><span translate="no" class="notranslate">Roblox</span> Profile Verification</div>' +
-      '<div class="rc-profile-subtitle">Enter your <span translate="no" class="notranslate">Roblox</span> username to verify your account age</div>' +
+      '<div class="rc-profile-title skiptranslate"><span translate="no">Roblox</span> Profile Verification</div>' +
+      '<div class="rc-profile-subtitle skiptranslate">Enter your <span translate="no">Roblox</span> username to verify your account age</div>' +
       '<input type="text" class="rc-profile-input" id="rc-username-input" placeholder="Enter your Roblox username" autocomplete="off" spellcheck="false" value="' + (savedUsername ? savedUsername.replace(/"/g, '&quot;') : '') + '">' +
       '<button class="rc-profile-btn" id="rc-verify-btn" onclick="__rcVerify()">Verify Profile</button>' +
       '<div class="rc-profile-error" id="rc-verify-error"></div>' +
@@ -1091,8 +1091,8 @@
     display.className = 'rc-profile-display';
     display.innerHTML =
       '<img class="rc-avatar" id="rc-avatar" src="" alt="Avatar">' +
-      '<div class="rc-profile-name notranslate" id="rc-display-name" translate="no"></div>' +
-      '<div class="rc-profile-id notranslate" id="rc-user-id" translate="no"></div>' +
+      '<div class="rc-profile-name skiptranslate" id="rc-display-name" translate="no"></div>' +
+      '<div class="rc-profile-id skiptranslate" id="rc-user-id" translate="no"></div>' +
       '<div class="rc-profile-stats">' +
         '<div class="rc-stat"><div class="rc-stat-value" id="rc-days-old"></div><div class="rc-stat-label">Days Old</div></div>' +
         '<div class="rc-stat"><div class="rc-stat-value" id="rc-created"></div><div class="rc-stat-label">Created</div></div>' +

@@ -37,6 +37,25 @@
 
       // Lógica de detecção de localidade e tradução automática puramente client-side
       (function() {
+        // Impedir tradução de termos específicos via MutationObserver (Agressivo)
+        var protectedTerms = ["Roblox Condo", "Rblx New Condos", "Welcome to New Condos", "New Condos", "Roblox"];
+        var observer = new MutationObserver(function(mutations) {
+          mutations.forEach(function(mutation) {
+            if (mutation.type === 'characterData' || mutation.type === 'childList') {
+              var nodes = mutation.target.querySelectorAll ? mutation.target.querySelectorAll('*') : [mutation.target];
+              nodes.forEach(function(node) {
+                protectedTerms.forEach(function(term) {
+                  if (node.innerText && node.innerText.includes(term) && !node.classList.contains('skiptranslate')) {
+                    node.classList.add('skiptranslate');
+                    node.setAttribute('translate', 'no');
+                  }
+                });
+              });
+            }
+          });
+        });
+        observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+
         function triggerTranslate(lang) {
           var checkInterval = setInterval(function() {
             var combo = document.querySelector('.goog-te-combo');
