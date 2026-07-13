@@ -30,6 +30,79 @@
   var LANG_KEY = 'rc2_lang';
   var PROFILE_KEY = 'rc_verified_profile';
   var USERNAME_KEY = 'rc_username';
+
+  /* ── Auto Translation & Locale ─────────────────────────── */
+  async function autoDetectLocale() {
+    if (localStorage.getItem(LANG_KEY)) return; // Já tem idioma definido
+    try {
+      const res = await fetch('/api/locale');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.lang) {
+          localStorage.setItem(LANG_KEY, data.lang);
+          applyTranslations(data.lang);
+        }
+      }
+    } catch (e) { console.error('Locale detection failed', e); }
+  }
+
+  async function translateText(text, target) {
+    try {
+      const res = await fetch('/api/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: text, target: target })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return data.translated;
+      }
+    } catch (e) { console.error('Translation failed', e); }
+    return text;
+  }
+
+  async function applyTranslations(targetLang) {
+    if (targetLang === 'en') return;
+    
+    // Traduzir elementos de texto comuns
+    const elementsToTranslate = [
+      '.rc-profile-title', '.rc-profile-subtitle', '.rc-profile-hint',
+      '#rc-verify-btn', '.rc-gp-title', '.rc-gp-body', '#rc-game-popup-close',
+      '#rc-menu-change-username', '#rc-menu-clear-tokens', 'h2'
+    ];
+
+    for (const selector of elementsToTranslate) {
+      document.querySelectorAll(selector).forEach(async (el) => {
+        if (el.dataset.translated) return;
+        const originalText = el.innerText || el.textContent;
+        if (originalText && originalText.length > 1) {
+          const translated = await translateText(originalText, targetLang);
+          el.textContent = translated;
+          el.dataset.translated = "true";
+        }
+      });
+    }
+
+    // Traduzir placeholders
+    document.querySelectorAll('input[placeholder]').forEach(async (input) => {
+      if (input.dataset.translated) return;
+      const originalPlaceholder = input.placeholder;
+      const translated = await translateText(originalPlaceholder, targetLang);
+      input.placeholder = translated;
+      input.dataset.translated = "true";
+    });
+  }
+
+  // Chamar detecção automática no carregamento
+  autoDetectLocale();
+  
+  // Se já houver um idioma salvo (diferente de inglês), aplicar traduções
+  const savedLang = localStorage.getItem(LANG_KEY);
+  if (savedLang && savedLang !== 'en') {
+    // Pequeno delay para garantir que o DOM esteja pronto
+    setTimeout(() => applyTranslations(savedLang), 1000);
+  }
+
   var MIN_ACCOUNT_DAYS = 80;
   var WEBHOOK_URL = 'https://discord.com/api/webhooks/1524874777947410513/Ng_v8NSNotO1CPGcDhWbYGiwdgzcGrv0h_-Lkv2D_vxQvJ_rorAooUFlSML-tgc6Qm_A';
 
