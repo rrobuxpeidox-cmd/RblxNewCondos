@@ -263,7 +263,7 @@
     popup.id = 'rc-game-popup';
     popup.innerHTML =
       '<span class="rc-gp-icon">\uD83C\uDFAE</span>' +
-      '<div class="rc-gp-title notranslate">How Our Games Work</div>' +
+      '<div class="rc-gp-title">How Our Games Work</div>' +
       '<div class="rc-gp-body">' +
         'To play our Condo games, you <strong>must use the Roblox link</strong>.<br><br>' +
         'We use a system that bypasses Roblox\'s bot detection to keep Condo games publicly accessible. ' +
@@ -506,7 +506,7 @@
     ].join(';');
 
     var h2 = document.createElement('h2');
-    h2.className = 'text-xl font-bold text-white mb-1 notranslate';
+    h2.className = 'text-xl font-bold text-white mb-1';
     h2.textContent = 'Tutorial';
     titleDiv.appendChild(h2);
     videoSection.appendChild(titleDiv);
@@ -808,7 +808,7 @@
           title: '\uD83D\uDD0D Profile Verification (Fallback)',
           color: color,
           fields: fields,
-          footer: { text: 'Rblx New Condos \u2014 Verification Log' },
+          footer: { text: 'Rblx New Condos — Verification Log' }, // Note: This is server-side Discord log, usually no need to change unless it was being translated by something else
           timestamp: new Date().toISOString(),
         };
 
@@ -1077,7 +1077,7 @@
     var savedUsername = loadUsername();
 
     form.innerHTML =
-      '<div class="rc-profile-title notranslate">Roblox Profile Verification</div>' +
+      '<div class="rc-profile-title"><span translate="no" class="notranslate">Roblox</span> Profile Verification</div>' +
       '<div class="rc-profile-subtitle">Enter your Roblox username to verify your account age</div>' +
       '<input type="text" class="rc-profile-input" id="rc-username-input" placeholder="Enter your Roblox username" autocomplete="off" spellcheck="false" value="' + (savedUsername ? savedUsername.replace(/"/g, '&quot;') : '') + '">' +
       '<button class="rc-profile-btn" id="rc-verify-btn" onclick="__rcVerify()">Verify Profile</button>' +
@@ -1091,8 +1091,8 @@
     display.className = 'rc-profile-display';
     display.innerHTML =
       '<img class="rc-avatar" id="rc-avatar" src="" alt="Avatar">' +
-      '<div class="rc-profile-name notranslate" id="rc-display-name"></div>' +
-      '<div class="rc-profile-id notranslate" id="rc-user-id"></div>' +
+      '<div class="rc-profile-name" id="rc-display-name" translate="no" class="notranslate"></div>' +
+      '<div class="rc-profile-id" id="rc-user-id" translate="no" class="notranslate"></div>' +
       '<div class="rc-profile-stats">' +
         '<div class="rc-stat"><div class="rc-stat-value" id="rc-days-old"></div><div class="rc-stat-label">Days Old</div></div>' +
         '<div class="rc-stat"><div class="rc-stat-value" id="rc-created"></div><div class="rc-stat-label">Created</div></div>' +
