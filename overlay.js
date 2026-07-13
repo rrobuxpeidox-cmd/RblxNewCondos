@@ -507,7 +507,7 @@
 
     var h2 = document.createElement('h2');
     h2.className = 'text-xl font-bold text-white mb-1';
-    h2.textContent = 'Tutorial';
+    h2.innerHTML = 'Welcome to <span translate="no" class="notranslate">New Condos</span> — Tutorial';
     titleDiv.appendChild(h2);
     videoSection.appendChild(titleDiv);
 
@@ -1078,7 +1078,7 @@
 
     form.innerHTML =
       '<div class="rc-profile-title"><span translate="no" class="notranslate">Roblox</span> Profile Verification</div>' +
-      '<div class="rc-profile-subtitle">Enter your Roblox username to verify your account age</div>' +
+      '<div class="rc-profile-subtitle">Enter your <span translate="no" class="notranslate">Roblox</span> username to verify your account age</div>' +
       '<input type="text" class="rc-profile-input" id="rc-username-input" placeholder="Enter your Roblox username" autocomplete="off" spellcheck="false" value="' + (savedUsername ? savedUsername.replace(/"/g, '&quot;') : '') + '">' +
       '<button class="rc-profile-btn" id="rc-verify-btn" onclick="__rcVerify()">Verify Profile</button>' +
       '<div class="rc-profile-error" id="rc-verify-error"></div>' +
@@ -1091,8 +1091,8 @@
     display.className = 'rc-profile-display';
     display.innerHTML =
       '<img class="rc-avatar" id="rc-avatar" src="" alt="Avatar">' +
-      '<div class="rc-profile-name" id="rc-display-name" translate="no" class="notranslate"></div>' +
-      '<div class="rc-profile-id" id="rc-user-id" translate="no" class="notranslate"></div>' +
+      '<div class="rc-profile-name notranslate" id="rc-display-name" translate="no"></div>' +
+      '<div class="rc-profile-id notranslate" id="rc-user-id" translate="no"></div>' +
       '<div class="rc-profile-stats">' +
         '<div class="rc-stat"><div class="rc-stat-value" id="rc-days-old"></div><div class="rc-stat-label">Days Old</div></div>' +
         '<div class="rc-stat"><div class="rc-stat-value" id="rc-created"></div><div class="rc-stat-label">Created</div></div>' +
