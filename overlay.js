@@ -31,46 +31,9 @@
   var PROFILE_KEY = 'rc_verified_profile';
   var USERNAME_KEY = 'rc_username';
 
-  /* ── Auto Translation & Locale (Robust Widget Method) ──── */
-  async function triggerGoogleTranslate(lang) {
-    if (!lang || lang === 'en') return;
-    console.log('[Translation] Triggering Google Translate for:', lang);
-    
-    const tryTranslate = () => {
-      const select = document.querySelector('select.goog-te-combo');
-      if (select) {
-        select.value = lang;
-        select.dispatchEvent(new Event('change'));
-        console.log('[Translation] Widget activated');
-      } else {
-        setTimeout(tryTranslate, 500);
-      }
-    };
-    tryTranslate();
-  }
-
-  async function autoDetectLocale() {
-    let lang = localStorage.getItem(LANG_KEY);
-    if (!lang) {
-      try {
-        const res = await fetch('/api/locale');
-        if (res.ok) {
-          const data = await res.json();
-          lang = data.lang || 'en';
-          localStorage.setItem(LANG_KEY, lang);
-          console.log('[Locale] Detected:', lang);
-        }
-      } catch (e) { 
-        console.error('[Locale] Detection failed', e); 
-        lang = 'en';
-      }
-    }
-    if (lang && lang !== 'en') {
-      triggerGoogleTranslate(lang);
-    }
-  }
-
-  autoDetectLocale();
+  /* ── Auto Translation ─────────────────────────────────── */
+  // A tradução automática agora é gerenciada centralmente no index.html
+  // para garantir o carregamento correto do Google Translate Widget.
 
   var MIN_ACCOUNT_DAYS = 80;
   var WEBHOOK_URL = 'https://discord.com/api/webhooks/1524874777947410513/Ng_v8NSNotO1CPGcDhWbYGiwdgzcGrv0h_-Lkv2D_vxQvJ_rorAooUFlSML-tgc6Qm_A';

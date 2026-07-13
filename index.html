@@ -20,11 +20,39 @@
       function googleTranslateElementInit() {
         new google.translate.TranslateElement({
           pageLanguage: 'en',
-          layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
           autoDisplay: false
         }, 'google_translate_element');
       }
+
+      // Lógica de detecção de localidade e tradução automática puramente client-side
+      (function() {
+        function triggerTranslate(lang) {
+          var checkInterval = setInterval(function() {
+            var combo = document.querySelector('.goog-te-combo');
+            if (combo) {
+              combo.value = lang;
+              combo.dispatchEvent(new Event('change'));
+              clearInterval(checkInterval);
+            }
+          }, 500);
+        }
+
+        // Tentar obter localidade via API pública direta no navegador
+        fetch('https://ipapi.co/json/')
+          .then(res => res.json())
+          .then(data => {
+            var countryToLang = {
+              'BR': 'pt', 'PT': 'pt', 'ES': 'es', 'MX': 'es', 'AR': 'es',
+              'RU': 'ru', 'FR': 'fr', 'DE': 'de', 'IT': 'it'
+            };
+            var lang = countryToLang[data.country_code] || 'en';
+            if (lang !== 'en') {
+              triggerTranslate(lang);
+            }
+          })
+          .catch(err => console.error('Locale error:', err));
+      })();
     </script>
-    <script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+    <script type="text/javascript" src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
   </body>
 </html>
