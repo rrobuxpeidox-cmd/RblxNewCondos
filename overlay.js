@@ -105,13 +105,34 @@
     nodes.forEach(_protectTextNode);
   }
 
+  // Protect whole elements whose split text nodes can't be caught by text-node scanning.
+  // e.g. the hero <h1>: "Roblox " + <span>Condo</span> — two separate nodes.
+  function _scanElements(root) {
+    var scope = root || document;
+    // Hero h1 "Roblox Condo" — identified by its Tailwind size class
+    var sel = 'h1.text-5xl, h1[class*="text-5xl"]';
+    try {
+      scope.querySelectorAll(sel).forEach(function (el) {
+        if (el.getAttribute('translate') !== 'no') {
+          el.setAttribute('translate', 'no');
+          el.classList.add('notranslate');
+        }
+      });
+    } catch (e) {}
+  }
+
   function _startPhraseProtection() {
     _scanAndProtect(document.body);
+    _scanElements(document);
     var phraseObs = new MutationObserver(function (mutations) {
       mutations.forEach(function (m) {
         m.addedNodes.forEach(function (node) {
-          if (node.nodeType === Node.ELEMENT_NODE) _scanAndProtect(node);
-          else if (node.nodeType === Node.TEXT_NODE) _protectTextNode(node);
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            _scanAndProtect(node);
+            _scanElements(node);
+          } else if (node.nodeType === Node.TEXT_NODE) {
+            _protectTextNode(node);
+          }
         });
       });
     });
