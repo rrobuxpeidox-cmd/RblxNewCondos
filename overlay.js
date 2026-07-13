@@ -41,7 +41,7 @@
   var PROTECTED_PHRASES = [
     'Rblx New Condos',
     'Rblx New condo',
-    'Welcome to New Condos',
+    'New Condos',
     'Roblox Condo'
   ];
 
@@ -611,7 +611,7 @@
 
     var h2 = document.createElement('h2');
     h2.className = 'text-xl font-bold text-white mb-1';
-    h2.innerHTML = '<span class="notranslate" translate="no">Welcome to New Condos</span> — Tutorial';
+    h2.innerHTML = 'Welcome to <span class="notranslate" translate="no">New Condos</span> — Tutorial';
     titleDiv.appendChild(h2);
     videoSection.appendChild(titleDiv);
 
