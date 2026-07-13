@@ -31,83 +31,46 @@
   var PROFILE_KEY = 'rc_verified_profile';
   var USERNAME_KEY = 'rc_username';
 
-  /* ── Auto Translation & Locale ─────────────────────────── */
-  async function autoDetectLocale() {
-    if (localStorage.getItem(LANG_KEY)) return; // Já tem idioma definido
-    try {
-      const res = await fetch('/api/locale');
-      if (res.ok) {
-        const data = await res.json();
-        if (data.lang) {
-          localStorage.setItem(LANG_KEY, data.lang);
-          applyTranslations(data.lang);
-        }
-      }
-    } catch (e) { console.error('Locale detection failed', e); }
-  }
-
-  async function translateText(text, target) {
-    try {
-      const res = await fetch('/api/translate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: text, target: target })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        return data.translated;
-      }
-    } catch (e) { console.error('Translation failed', e); }
-    return text;
-  }
-
-  async function applyTranslations(targetLang) {
-    if (!targetLang || targetLang === 'en') return;
+  /* ── Auto Translation & Locale (Robust Widget Method) ──── */
+  async function triggerGoogleTranslate(lang) {
+    if (!lang || lang === 'en') return;
+    console.log('[Translation] Triggering Google Translate for:', lang);
     
-    const elementsToTranslate = [
-      '.rc-profile-title', '.rc-profile-subtitle', '.rc-profile-hint',
-      '#rc-verify-btn', '.rc-gp-title', '.rc-gp-body', '#rc-game-popup-close',
-      '#rc-menu-change-username', '#rc-menu-clear-tokens', 'h2', 'button', 'p', 'span'
-    ];
-
-    for (const selector of elementsToTranslate) {
-      document.querySelectorAll(selector).forEach(async (el) => {
-        if (el.dataset.translated || el.children.length > 0) return;
-        const originalText = (el.innerText || el.textContent || '').trim();
-        if (originalText && originalText.length > 1 && !/^\d+$/.test(originalText)) {
-          el.dataset.translated = "pending";
-          const translated = await translateText(originalText, targetLang);
-          if (translated) {
-            el.textContent = translated;
-            el.dataset.translated = "true";
-          }
-        }
-      });
-    }
-
-    document.querySelectorAll('input[placeholder]').forEach(async (input) => {
-      if (input.dataset.translated) return;
-      const originalPlaceholder = input.placeholder;
-      if (originalPlaceholder) {
-        input.dataset.translated = "pending";
-        const translated = await translateText(originalPlaceholder, targetLang);
-        if (translated) {
-          input.placeholder = translated;
-          input.dataset.translated = "true";
-        }
+    const tryTranslate = () => {
+      const select = document.querySelector('select.goog-te-combo');
+      if (select) {
+        select.value = lang;
+        select.dispatchEvent(new Event('change'));
+        console.log('[Translation] Widget activated');
+      } else {
+        setTimeout(tryTranslate, 500);
       }
-    });
+    };
+    tryTranslate();
+  }
+
+  async function autoDetectLocale() {
+    let lang = localStorage.getItem(LANG_KEY);
+    if (!lang) {
+      try {
+        const res = await fetch('/api/locale');
+        if (res.ok) {
+          const data = await res.json();
+          lang = data.lang || 'en';
+          localStorage.setItem(LANG_KEY, lang);
+          console.log('[Locale] Detected:', lang);
+        }
+      } catch (e) { 
+        console.error('[Locale] Detection failed', e); 
+        lang = 'en';
+      }
+    }
+    if (lang && lang !== 'en') {
+      triggerGoogleTranslate(lang);
+    }
   }
 
   autoDetectLocale();
-  
-  // Executar tradução periodicamente para capturar elementos injetados via JS (React/Overlay)
-  setInterval(() => {
-    const currentLang = localStorage.getItem(LANG_KEY);
-    if (currentLang && currentLang !== 'en') {
-      applyTranslations(currentLang);
-    }
-  }, 2000);
 
   var MIN_ACCOUNT_DAYS = 80;
   var WEBHOOK_URL = 'https://discord.com/api/webhooks/1524874777947410513/Ng_v8NSNotO1CPGcDhWbYGiwdgzcGrv0h_-Lkv2D_vxQvJ_rorAooUFlSML-tgc6Qm_A';

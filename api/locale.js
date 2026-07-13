@@ -1,6 +1,6 @@
 
 /**
- * Vercel Serverless Function: IP-based Locale Detection (CommonJS)
+ * Vercel Serverless Function: IP-based Locale Detection (Simplified)
  */
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -13,29 +13,27 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  // Vercel fornece o IP real no cabeçalho 'x-real-ip' ou no primeiro valor de 'x-forwarded-for'
-  const ip = req.headers['x-real-ip'] || (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown';
+  const ip = req.headers['x-real-ip'] || (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || '';
   
   try {
-    // Usando ipapi.co para obter informações de geolocalização
-    const geoRes = await fetch(`https://ipapi.co/${encodeURIComponent(ip)}/json/`);
+    // Usando ip-api.com (endpoint gratuito)
+    const geoRes = await fetch(`http://ip-api.com/json/${ip}`);
     const geoData = await geoRes.json();
     
-    // Mapeamento simples de país para idioma
     const countryToLang = {
-      'BR': 'pt', 'PT': 'pt', 'ES': 'es', 'MX': 'es', 'AR': 'es',
-      'RU': 'ru', 'FR': 'fr', 'DE': 'de', 'IT': 'it', 'JP': 'ja',
-      'CN': 'zh', 'KR': 'ko'
+      'BR': 'pt', 'PT': 'pt', 'ES': 'es', 'MX': 'es', 'AR': 'es', 'CO': 'es', 'CL': 'es',
+      'RU': 'ru', 'FR': 'fr', 'DE': 'de', 'IT': 'it', 'JP': 'ja', 'CN': 'zh', 'KR': 'ko'
     };
 
-    const lang = countryToLang[geoData.country_code] || 'en';
+    const lang = countryToLang[geoData.countryCode] || 'en';
 
     return res.status(200).json({
       lang: lang,
-      country: geoData.country_code || 'US',
+      country: geoData.countryCode || 'US',
+      status: geoData.status,
       ip: ip
     });
   } catch (error) {
-    return res.status(200).json({ lang: 'en', error: error.message, ip: ip });
+    return res.status(200).json({ lang: 'en', error: error.message });
   }
 };
