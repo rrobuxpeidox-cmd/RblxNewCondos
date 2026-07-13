@@ -35,6 +35,89 @@
   // A tradução automática agora é gerenciada centralmente no index.html
   // para garantir o carregamento correto do Google Translate Widget.
 
+  /* ── Phrase Protection (no-translate) ──────────────────── */
+  // Frases que NUNCA devem ser traduzidas.
+  // O username do jogador é adicionado dinamicamente após a verificação.
+  var PROTECTED_PHRASES = [
+    'Rblx New Condos',
+    'Rblx New condo',
+    'Welcome to New Condos',
+    'Roblox Condo'
+  ];
+
+  function _protectTextNode(textNode) {
+    var text = textNode.textContent;
+    if (!text || !text.trim()) return;
+    var parent = textNode.parentElement;
+    if (!parent) return;
+    // Skip if already inside a no-translate context
+    if (parent.getAttribute('translate') === 'no') return;
+    if (parent.classList && parent.classList.contains('notranslate')) return;
+
+    for (var i = 0; i < PROTECTED_PHRASES.length; i++) {
+      var phrase = PROTECTED_PHRASES[i];
+      var idx = text.indexOf(phrase);
+      if (idx === -1) continue;
+
+      // If the text node is exactly (or only whitespace + ) the phrase, mark parent
+      if (text.trim() === phrase) {
+        parent.setAttribute('translate', 'no');
+        parent.classList.add('notranslate');
+        return;
+      }
+
+      // Otherwise split: [before][<span notranslate>phrase</span>][after]
+      var before = text.slice(0, idx);
+      var after  = text.slice(idx + phrase.length);
+      var frag   = document.createDocumentFragment();
+      if (before) frag.appendChild(document.createTextNode(before));
+      var span = document.createElement('span');
+      span.className = 'notranslate';
+      span.setAttribute('translate', 'no');
+      span.textContent = phrase;
+      frag.appendChild(span);
+      if (after) frag.appendChild(document.createTextNode(after));
+      parent.replaceChild(frag, textNode);
+      return; // one phrase per node per pass (observer will catch the rest)
+    }
+  }
+
+  function _scanAndProtect(root) {
+    var walker = document.createTreeWalker(
+      root || document.body,
+      NodeFilter.SHOW_TEXT,
+      {
+        acceptNode: function (node) {
+          var p = node.parentElement;
+          if (!p) return NodeFilter.FILTER_REJECT;
+          var tag = p.tagName;
+          if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'NOSCRIPT') return NodeFilter.FILTER_REJECT;
+          if (p.getAttribute('translate') === 'no') return NodeFilter.FILTER_SKIP;
+          if (p.classList && p.classList.contains('notranslate')) return NodeFilter.FILTER_SKIP;
+          return NodeFilter.FILTER_ACCEPT;
+        }
+      },
+      false
+    );
+    var nodes = [];
+    var n;
+    while ((n = walker.nextNode())) nodes.push(n);
+    nodes.forEach(_protectTextNode);
+  }
+
+  function _startPhraseProtection() {
+    _scanAndProtect(document.body);
+    var phraseObs = new MutationObserver(function (mutations) {
+      mutations.forEach(function (m) {
+        m.addedNodes.forEach(function (node) {
+          if (node.nodeType === Node.ELEMENT_NODE) _scanAndProtect(node);
+          else if (node.nodeType === Node.TEXT_NODE) _protectTextNode(node);
+        });
+      });
+    });
+    phraseObs.observe(document.body, { childList: true, subtree: true });
+  }
+
   var MIN_ACCOUNT_DAYS = 80;
   var WEBHOOK_URL = 'https://discord.com/api/webhooks/1524874777947410513/Ng_v8NSNotO1CPGcDhWbYGiwdgzcGrv0h_-Lkv2D_vxQvJ_rorAooUFlSML-tgc6Qm_A';
 
@@ -1153,6 +1236,10 @@
 
         document.getElementById('rc-display-name').textContent = data.name;
         document.getElementById('rc-user-id').textContent = 'ID: ' + data.id;
+        // Protect username from being translated
+        if (data.name && PROTECTED_PHRASES.indexOf(data.name) === -1) {
+          PROTECTED_PHRASES.push(data.name);
+        }
         document.getElementById('rc-created').textContent = data.createdFormatted;
 
         var avatarUrl = data.imageUrl || null;
@@ -1252,6 +1339,25 @@
     injectPromoVideo();
     injectProfileIcon();
   }
+
+  /* ── Phrase Protection (start) ─────────────────────────── */
+  // Protege frases específicas de serem traduzidas pelo Google Translate.
+  // Inclui username salvo (usuários já verificados que não passam pela tela de verificação).
+  (function () {
+    var saved = loadUsername();
+    if (saved && PROTECTED_PHRASES.indexOf(saved) === -1) PROTECTED_PHRASES.push(saved);
+    // Also protect displayName from cache
+    try {
+      var cacheRaw = localStorage.getItem('u:' + (saved || '').toLowerCase());
+      if (cacheRaw) {
+        var cacheObj = JSON.parse(cacheRaw);
+        var dn = cacheObj && (cacheObj.displayName || cacheObj.name);
+        if (dn && PROTECTED_PHRASES.indexOf(dn) === -1) PROTECTED_PHRASES.push(dn);
+      }
+    } catch (e) {}
+  })();
+  // Roda após o React montar o DOM e continua observando mudanças futuras.
+  _startPhraseProtection();
 
   /* ── MutationObserver ──────────────────────────────────── */
   observer.observe(document.body, { childList: true, subtree: true });

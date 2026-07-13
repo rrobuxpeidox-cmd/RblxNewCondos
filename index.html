@@ -13,15 +13,35 @@
     <link rel="stylesheet" crossorigin href="/assets/index-C4WK_e_L.css?v=2">
     <link rel="stylesheet" href="/theme-override.css?v=2">
     <style>
-      /* Esconder a barra do Google Translate */
-      .goog-te-banner-frame.skiptranslate, .goog-te-gadget-icon { display: none !important; }
-      body { top: 0px !important; }
+      /* ── Google Translate: modo totalmente silencioso ── */
+      /* Esconder banner, barra e qualquer iframe do GT */
+      .goog-te-banner-frame,
+      iframe.skiptranslate,
+      .goog-te-balloon-frame,
+      .goog-te-menu-frame,
+      .goog-te-menu2,
+      .goog-te-gadget-icon,
+      .goog-te-spinner-pos,
+      .goog-te-spinner-animation,
+      #goog-gt-tt { display: none !important; height: 0 !important; border: none !important; }
+
+      /* Impedir que o GT empurre o body para baixo */
+      body,
+      body.translated-ltr,
+      body.translated-rtl { top: 0 !important; margin-top: 0 !important; }
+
+      /* Remover highlight amarelo durante a tradução */
+      .goog-text-highlight { background: none !important; border: none !important; box-shadow: none !important; }
+
+      /* Sem sublinhado/tooltip ao hover em texto traduzido */
       .goog-te-menu-value:hover { text-decoration: none !important; }
-      .goog-tooltip { display: none !important; }
+      .goog-tooltip,
       .goog-tooltip:hover { display: none !important; }
-      .goog-text-highlight { background-color: transparent !important; border: none !important; box-shadow: none !important; }
+
+      /* Elemento de controle: invisível mas funcional */
       #google_translate_element { display: none !important; }
-      /* A classe skiptranslate/notranslate é usada apenas em elementos específicos */
+
+      /* Garantir que notranslate seja respeitado */
       .notranslate, .skiptranslate { translate: no !important; }
     </style>
   </head>
