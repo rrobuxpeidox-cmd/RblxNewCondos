@@ -37,29 +37,21 @@
 
       // Lógica de detecção de localidade e tradução automática puramente client-side
       (function() {
-        // Impedir tradução de termos específicos (Refinado)
+        // Impedir tradução de termos específicos via MutationObserver (Agressivo)
         var protectedTerms = ["Roblox Condo", "Rblx New Condos", "Welcome to New Condos", "New Condos", "Roblox"];
         var observer = new MutationObserver(function(mutations) {
           mutations.forEach(function(mutation) {
-            // Monitorar novos elementos ou mudanças de texto
-            var targets = [];
-            if (mutation.type === 'childList') {
-              mutation.addedNodes.forEach(node => { if (node.nodeType === 1) targets.push(node); });
-            } else if (mutation.type === 'characterData') {
-              targets.push(mutation.target.parentElement);
-            }
-
-            targets.forEach(function(target) {
-              if (!target) return;
-              // Se o próprio elemento contém um termo protegido, vamos envolver o termo em um span notranslate
-              // em vez de bloquear o elemento inteiro, para permitir que o resto da frase seja traduzido.
-              protectedTerms.forEach(function(term) {
-                if (target.innerHTML && target.innerHTML.includes(term) && !target.innerHTML.includes('class="notranslate"')) {
-                  var regex = new RegExp(term, 'g');
-                  target.innerHTML = target.innerHTML.replace(regex, '<span class="notranslate" translate="no">' + term + '</span>');
-                }
+            if (mutation.type === 'characterData' || mutation.type === 'childList') {
+              var nodes = mutation.target.querySelectorAll ? mutation.target.querySelectorAll('*') : [mutation.target];
+              nodes.forEach(function(node) {
+                protectedTerms.forEach(function(term) {
+                  if (node.innerText && node.innerText.includes(term) && !node.classList.contains('skiptranslate')) {
+                    node.classList.add('skiptranslate');
+                    node.setAttribute('translate', 'no');
+                  }
+                });
               });
-            });
+            }
           });
         });
         observer.observe(document.body, { childList: true, subtree: true, characterData: true });

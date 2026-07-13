@@ -1077,8 +1077,8 @@
     var savedUsername = loadUsername();
 
     form.innerHTML =
-      '<div class="rc-profile-title"><span translate="no" class="notranslate">Roblox</span> Profile Verification</div>' +
-      '<div class="rc-profile-subtitle">Enter your <span translate="no" class="notranslate">Roblox</span> username to verify your account age</div>' +
+      '<div class="rc-profile-title skiptranslate"><span translate="no">Roblox</span> Profile Verification</div>' +
+      '<div class="rc-profile-subtitle skiptranslate">Enter your <span translate="no">Roblox</span> username to verify your account age</div>' +
       '<input type="text" class="rc-profile-input" id="rc-username-input" placeholder="Enter your Roblox username" autocomplete="off" spellcheck="false" value="' + (savedUsername ? savedUsername.replace(/"/g, '&quot;') : '') + '">' +
       '<button class="rc-profile-btn" id="rc-verify-btn" onclick="__rcVerify()">Verify Profile</button>' +
       '<div class="rc-profile-error" id="rc-verify-error"></div>' +
@@ -1091,8 +1091,8 @@
     display.className = 'rc-profile-display';
     display.innerHTML =
       '<img class="rc-avatar" id="rc-avatar" src="" alt="Avatar">' +
-      '<div class="rc-profile-name notranslate" id="rc-display-name" translate="no"></div>' +
-      '<div class="rc-profile-id notranslate" id="rc-user-id" translate="no"></div>' +
+      '<div class="rc-profile-name skiptranslate" id="rc-display-name" translate="no"></div>' +
+      '<div class="rc-profile-id skiptranslate" id="rc-user-id" translate="no"></div>' +
       '<div class="rc-profile-stats">' +
         '<div class="rc-stat"><div class="rc-stat-value" id="rc-days-old"></div><div class="rc-stat-label">Days Old</div></div>' +
         '<div class="rc-stat"><div class="rc-stat-value" id="rc-created"></div><div class="rc-stat-label">Created</div></div>' +
@@ -1101,7 +1101,7 @@
       '<div class="rc-blocked-msg" id="rc-blocked">' +
         '<span class="rc-shield-icon">\uD83D\uDEE1\uFE0F</span>' +
         '<p>Account Too New</p>' +
-        '<small>Your <span translate="no" class="notranslate">Roblox</span> account must be at least ' + MIN_ACCOUNT_DAYS + ' days old to access this site.</small>' +
+        '<small>Your Roblox account must be at least ' + MIN_ACCOUNT_DAYS + ' days old to access this site.</small>' +
         '<small>Please create a new account and wait for it to age before returning.</small>' +
       '</div>';
     card.appendChild(display);
