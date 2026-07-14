@@ -14,7 +14,6 @@
     <link rel="stylesheet" href="/theme-override.css?v=2">
     <style>
       /* ── Google Translate: modo totalmente silencioso ── */
-      /* Esconder banner, barra e qualquer iframe do GT */
       .goog-te-banner-frame,
       iframe.skiptranslate,
       .goog-te-balloon-frame,
@@ -25,23 +24,17 @@
       .goog-te-spinner-animation,
       #goog-gt-tt { display: none !important; height: 0 !important; border: none !important; }
 
-      /* Impedir que o GT empurre o body para baixo */
       body,
       body.translated-ltr,
       body.translated-rtl { top: 0 !important; margin-top: 0 !important; }
 
-      /* Remover highlight amarelo durante a tradução */
       .goog-text-highlight { background: none !important; border: none !important; box-shadow: none !important; }
 
-      /* Sem sublinhado/tooltip ao hover em texto traduzido */
       .goog-te-menu-value:hover { text-decoration: none !important; }
       .goog-tooltip,
       .goog-tooltip:hover { display: none !important; }
 
-      /* Elemento de controle: invisível mas funcional */
       #google_translate_element { display: none !important; }
-
-      /* Garantir que notranslate seja respeitado */
       .notranslate, .skiptranslate { translate: no !important; }
     </style>
   </head>
@@ -56,7 +49,6 @@
         }, 'google_translate_element');
       }
 
-      // Lógica de detecção de localidade e tradução automática puramente client-side
       (function() {
         function triggerTranslate(lang) {
           var checkInterval = setInterval(function() {
@@ -69,20 +61,21 @@
           }, 500);
         }
 
-        // Tentar obter localidade via API pública direta no navegador
-        fetch('https://ipapi.co/json/')
+        // Chamada para a nossa API locale que agora suporta mapeamento universal
+        fetch('/api/locale')
           .then(res => res.json())
           .then(data => {
-            var countryToLang = {
-              'BR': 'pt', 'PT': 'pt', 'ES': 'es', 'MX': 'es', 'AR': 'es',
-              'RU': 'ru', 'FR': 'fr', 'DE': 'de', 'IT': 'it'
-            };
-            var lang = countryToLang[data.country_code] || 'en';
-            if (lang !== 'en') {
-              triggerTranslate(lang);
+            if (data.lang && data.lang !== 'en') {
+              triggerTranslate(data.lang);
             }
           })
-          .catch(err => console.error('Locale error:', err));
+          .catch(err => {
+            // Fallback para idioma do navegador se a API falhar
+            var navLang = (navigator.language || navigator.userLanguage).split('-')[0];
+            if (navLang && navLang !== 'en') {
+              triggerTranslate(navLang);
+            }
+          });
       })();
     </script>
     <script type="text/javascript" src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
