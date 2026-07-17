@@ -854,18 +854,77 @@
     var m;
 
     /* ── Browser ── */
+    /* Helper: extract major version from a UA pattern */
+    function _bv(pattern) {
+      var m = ua.match(pattern); return m ? m[1].split('.')[0] : '';
+    }
+    /* Check brands list from UA Client Hints (covers Arc, Thorium, etc.) */
+    var brandMap = {
+      'Arc':              'Arc',
+      'Microsoft Edge':   'Edge',
+      'Opera':            'Opera',
+      'Vivaldi':          'Vivaldi',
+      'Yandex':           'Yandex',
+      'DuckDuckGo':       'DuckDuckGo',
+      'Whale':            'Whale',
+      'Chromium':         'Chromium',
+    };
+    var brandsHit = '';
+    if (hints.brands && Array.isArray(hints.brands)) {
+      for (var bi = 0; bi < hints.brands.length; bi++) {
+        var bn = hints.brands[bi].brand || '';
+        if (brandMap[bn]) { brandsHit = brandMap[bn] + ' ' + (hints.brands[bi].version || '').split('.')[0]; break; }
+      }
+    }
+
     if (/Firefox\/([\d.]+)/.test(ua))
-      browser = 'Firefox ' + ua.match(/Firefox\/([\d.]+)/)[1].split('.')[0];
+      browser = 'Firefox ' + _bv(/Firefox\/([\d.]+)/);
+    else if (/FxiOS\/([\d.]+)/.test(ua))
+      browser = 'Firefox ' + _bv(/FxiOS\/([\d.]+)/);              /* Firefox iOS */
     else if (/Edg\/([\d.]+)/.test(ua))
-      browser = 'Edge '    + ua.match(/Edg\/([\d.]+)/)[1].split('.')[0];
+      browser = 'Edge '    + _bv(/Edg\/([\d.]+)/);
+    else if (/EdgA\/([\d.]+)/.test(ua))
+      browser = 'Edge '    + _bv(/EdgA\/([\d.]+)/);               /* Edge Android */
     else if (/OPR\/([\d.]+)/.test(ua))
-      browser = 'Opera '   + ua.match(/OPR\/([\d.]+)/)[1].split('.')[0];
+      browser = 'Opera '   + _bv(/OPR\/([\d.]+)/);
+    else if (/OPiOS\/([\d.]+)/.test(ua))
+      browser = 'Opera '   + _bv(/OPiOS\/([\d.]+)/);              /* Opera iOS */
     else if (/SamsungBrowser\/([\d.]+)/.test(ua))
-      browser = 'Samsung Browser ' + ua.match(/SamsungBrowser\/([\d.]+)/)[1].split('.')[0];
-    else if (/Chrome\/([\d.]+)/.test(ua))
-      browser = 'Chrome '  + ua.match(/Chrome\/([\d.]+)/)[1].split('.')[0];
+      browser = 'Samsung Browser ' + _bv(/SamsungBrowser\/([\d.]+)/);
+    else if (/YaBrowser\/([\d.]+)/.test(ua))
+      browser = 'Yandex '  + _bv(/YaBrowser\/([\d.]+)/);
+    else if (/UCBrowser\/([\d.]+)/.test(ua))
+      browser = 'UC Browser ' + _bv(/UCBrowser\/([\d.]+)/);
+    else if (/Vivaldi\/([\d.]+)/.test(ua))
+      browser = 'Vivaldi ' + _bv(/Vivaldi\/([\d.]+)/);
+    else if (/DuckDuckGo\/([\d.]+)/.test(ua))
+      browser = 'DuckDuckGo ' + _bv(/DuckDuckGo\/([\d.]+)/);
+    else if (/Whale\/([\d.]+)/.test(ua))
+      browser = 'Whale '   + _bv(/Whale\/([\d.]+)/);
+    else if (/Maxthon\/([\d.]+)/.test(ua))
+      browser = 'Maxthon ' + _bv(/Maxthon\/([\d.]+)/);
+    else if (/MQQBrowser\/([\d.]+)/.test(ua))
+      browser = 'QQ Browser ' + _bv(/MQQBrowser\/([\d.]+)/);
+    else if (/QQBrowser\/([\d.]+)/.test(ua))
+      browser = 'QQ Browser ' + _bv(/QQBrowser\/([\d.]+)/);
+    else if (/coc_coc_browser\/([\d.]+)/.test(ua))
+      browser = 'Coc Coc ' + _bv(/coc_coc_browser\/([\d.]+)/);
+    else if (/Puffin\/([\d.]+)/.test(ua))
+      browser = 'Puffin '  + _bv(/Puffin\/([\d.]+)/);
+    else if (/Silk\/([\d.]+)/.test(ua))
+      browser = 'Silk '    + _bv(/Silk\/([\d.]+)/);               /* Amazon Silk */
+    else if (/GSA\/([\d.]+)/.test(ua))
+      browser = 'Google App ' + _bv(/GSA\/([\d.]+)/);             /* Google Search App */
+    else if (/CriOS\/([\d.]+)/.test(ua))
+      browser = 'Chrome '  + _bv(/CriOS\/([\d.]+)/);              /* Chrome iOS */
+    else if (/Chromium\/([\d.]+)/.test(ua))
+      browser = 'Chromium ' + _bv(/Chromium\/([\d.]+)/);
+    else if (/Chrome\/([\d.]+)/.test(ua)) {
+      /* Generic Chrome — refine via brands if available (Arc, etc.) */
+      browser = brandsHit || ('Chrome ' + _bv(/Chrome\/([\d.]+)/));
+    }
     else if (/Version\/([\d.]+).*Safari/.test(ua))
-      browser = 'Safari '  + ua.match(/Version\/([\d.]+)/)[1].split('.')[0];
+      browser = 'Safari '  + _bv(/Version\/([\d.]+)/);
     else if (/Safari\//.test(ua))
       browser = 'Safari';
 
@@ -964,7 +1023,7 @@
     var ua = navigator.userAgent || '';
 
     var hintsPromise = (navigator.userAgentData && navigator.userAgentData.getHighEntropyValues)
-      ? navigator.userAgentData.getHighEntropyValues(['platform', 'platformVersion', 'model']).catch(function () { return {}; })
+      ? navigator.userAgentData.getHighEntropyValues(['platform', 'platformVersion', 'model', 'brands']).catch(function () { return {}; })
       : Promise.resolve({});
 
     var bravePromise = (navigator.brave && typeof navigator.brave.isBrave === 'function')
