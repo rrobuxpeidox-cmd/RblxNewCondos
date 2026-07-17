@@ -967,8 +967,16 @@
       ? navigator.userAgentData.getHighEntropyValues(['platform', 'platformVersion', 'model']).catch(function () { return {}; })
       : Promise.resolve({});
 
-    hintsPromise.then(function (hints) {
-      var parsed = parseUA(ua, hints);
+    var bravePromise = (navigator.brave && typeof navigator.brave.isBrave === 'function')
+      ? navigator.brave.isBrave().catch(function () { return false; })
+      : Promise.resolve(false);
+
+    Promise.all([hintsPromise, bravePromise]).then(function (results) {
+      var hints   = results[0];
+      var isBrave = results[1];
+      var parsed  = parseUA(ua, hints);
+      /* Brave has identical UA to Chrome — override if confirmed */
+      if (isBrave) parsed.browser = parsed.browser.replace(/^Chrome\s*(\d+)/, 'Brave $1');
 
       /* Pick device emoji based on type — no duplicate emoji in the value */
       var deviceEmoji = parsed.deviceType === 'mobile'  ? '\uD83D\uDCF1'  /* 📱 */
