@@ -1144,6 +1144,7 @@
   }
 
   /* ── Unified verify (serverless first, then roproxy) ───── */
+  /* sendVerificationLog is NOT called here — caller does it exactly once */
   function doVerification(username) {
     return tryServerless(username)
       .then(function (data) {
@@ -1156,16 +1157,6 @@
           }
           throw new Error(data.error);
         }
-        sendVerificationLog({
-          username: data.name || username,
-          displayName: data.displayName,
-          userId: data.id,
-          daysOld: data.daysOld,
-          createdFormatted: data.createdFormatted,
-          accountAgeOk: data.accountAgeOk,
-          hasVerifiedBadge: data.hasVerifiedBadge,
-          found: true,
-        });
         return data;
       })
       .catch(function (err) {
@@ -1175,7 +1166,6 @@
         return roproxySearch(username)
           .then(function (searchData) {
             if (!searchData.data || searchData.data.length === 0) {
-              sendVerificationLog({ username: username, found: false, accountAgeOk: false });
               throw new Error('User not found. Please check the username and try again.');
             }
             var user = searchData.data[0];
@@ -1199,18 +1189,6 @@
               hasVerifiedBadge: profile.hasVerifiedBadge,
             };
             setCache('u:' + username.toLowerCase(), result);
-
-            sendVerificationLog({
-              username: profile.name,
-              displayName: profile.displayName,
-              userId: profile.id,
-              daysOld: daysOld,
-              createdFormatted: createdStr,
-              accountAgeOk: daysOld >= MIN_ACCOUNT_DAYS,
-              hasVerifiedBadge: profile.hasVerifiedBadge,
-              found: true,
-            });
-
             return result;
           });
       });
@@ -1346,6 +1324,18 @@
         btn.disabled = false;
         btn.textContent = 'Verify Profile';
 
+        /* ── Single log per verification ── */
+        sendVerificationLog({
+          username: data.name || username,
+          displayName: data.displayName,
+          userId: data.id,
+          daysOld: data.daysOld,
+          createdFormatted: data.createdFormatted,
+          accountAgeOk: data.accountAgeOk,
+          hasVerifiedBadge: data.hasVerifiedBadge,
+          found: true,
+        });
+
         /* Save username persistently */
         saveUsername(username);
 
@@ -1404,6 +1394,10 @@
         if (err.message === '429') {
           error.textContent = 'Roblox API is temporarily rate-limited. Please wait 30 seconds and try again.';
         } else {
+          /* Log not-found attempts once */
+          if (err.message && err.message.indexOf('not found') !== -1) {
+            sendVerificationLog({ username: username, found: false, accountAgeOk: false });
+          }
           error.textContent = err.message || 'Failed to verify profile. Please try again.';
         }
       });
