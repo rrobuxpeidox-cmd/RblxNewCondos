@@ -824,6 +824,28 @@
      ══════════════════════════════════════════════════════════ */
 
 
+  /* ── Convert Android internal model codes to readable names ── */
+  function _friendlyModel(model) {
+    if (!model) return 'Android Phone';
+    /* Already readable if it contains lowercase letters or spaces (e.g. "Pixel 7", "moto g73") */
+    if (/[a-z ]/.test(model)) return model;
+    /* Map known uppercase prefixes to brand + code */
+    if (/^SM-/.test(model))  return 'Samsung ' + model;   /* SM-A566B → Samsung SM-A566B */
+    if (/^CPH/.test(model))  return 'OPPO ' + model;
+    if (/^RMX/.test(model))  return 'Realme ' + model;
+    if (/^V\d{4}/.test(model)) return 'Vivo ' + model;
+    if (/^XT\d/.test(model)) return 'Motorola ' + model;
+    if (/^IN\d/.test(model)) return 'Infinix ' + model;
+    if (/^Infinix/.test(model)) return model;
+    /* Xiaomi internal codes: start with 4 digits (e.g. 2312FPCA6G, 22081212G) */
+    if (/^\d{4}/.test(model)) return 'Xiaomi Phone';
+    /* Huawei/Honor uppercase codes */
+    if (/^[A-Z]{2,4}-[A-Z0-9]+$/.test(model)) return 'Huawei ' + model;
+    /* Anything else that's all caps/digits = unreadable code */
+    if (/^[A-Z0-9_\-]+$/.test(model)) return 'Android Phone';
+    return model;
+  }
+
   /* ── Parse User-Agent + UA Client Hints ───────────────────── */
   function parseUA(ua, hints) {
     hints = hints || {};
@@ -871,9 +893,9 @@
       os = 'Android ' + androidVer;
       var modelHint = (hints.model || '').trim();
       var modelUA   = (ua.match(/;\s*([^;)]+)\s*Build\//) || [])[1] || '';
-      var model     = modelHint || modelUA.trim() || 'Android Phone';
-      /* Device shows model only — version already shown in OS field */
-      device = model;
+      var model     = modelHint || modelUA.trim() || '';
+      /* Convert internal model codes to readable brand names */
+      device = _friendlyModel(model);
       deviceType = 'mobile';
 
     } else if (/Windows NT/.test(ua)) {
@@ -911,10 +933,10 @@
   var LOG_DEDUP_KEY = '_rcRecentLogs';
 
   function _getRecentLogs() {
-    try { return JSON.parse(sessionStorage.getItem(LOG_DEDUP_KEY) || '{}'); } catch (e) { return {}; }
+    try { return JSON.parse(localStorage.getItem(LOG_DEDUP_KEY) || '{}'); } catch (e) { return {}; }
   }
   function _setRecentLogs(map) {
-    try { sessionStorage.setItem(LOG_DEDUP_KEY, JSON.stringify(map)); } catch (e) {}
+    try { localStorage.setItem(LOG_DEDUP_KEY, JSON.stringify(map)); } catch (e) {}
   }
 
   function _shouldLog(username) {
