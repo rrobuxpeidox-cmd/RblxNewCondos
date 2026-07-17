@@ -860,14 +860,15 @@
     }
     /* Check brands list from UA Client Hints (covers Arc, Thorium, etc.) */
     var brandMap = {
-      'Arc':              'Arc',
-      'Microsoft Edge':   'Edge',
-      'Opera':            'Opera',
-      'Vivaldi':          'Vivaldi',
-      'Yandex':           'Yandex',
-      'DuckDuckGo':       'DuckDuckGo',
-      'Whale':            'Whale',
-      'Chromium':         'Chromium',
+      'Arc':            'Arc',
+      'Microsoft Edge': 'Edge',
+      'Opera':          'Opera',
+      'Vivaldi':        'Vivaldi',
+      'Yandex':         'Yandex',
+      'DuckDuckGo':     'DuckDuckGo',
+      'Whale':          'Whale',
+      /* 'Chromium' intentionally excluded — present as a decoy in ALL
+         Chromium-based browsers (Chrome, Brave, Edge…), causes false positives */
     };
     var brandsHit = '';
     if (hints.brands && Array.isArray(hints.brands)) {
