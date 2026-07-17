@@ -865,12 +865,15 @@
     } else if (/Android/.test(ua) || hints.platform === 'Android') {
       var verFromHint = hints.platformVersion || '';
       var verFromUA   = (ua.match(/Android ([\d.]+)/) || [])[1] || '';
-      var androidVer  = (verFromHint && verFromHint !== verFromUA) ? verFromHint : (verFromUA || verFromHint);
+      var androidVerRaw = (verFromHint && verFromHint !== verFromUA) ? verFromHint : (verFromUA || verFromHint);
+      /* Trim trailing .0 segments: 16.0.0 → 16, 13.1.0 → 13.1 */
+      var androidVer = androidVerRaw.replace(/(\.\d*[1-9])0+$|\.0+$/g, '$1').replace(/\.0+$/, '');
       os = 'Android ' + androidVer;
       var modelHint = (hints.model || '').trim();
       var modelUA   = (ua.match(/;\s*([^;)]+)\s*Build\//) || [])[1] || '';
       var model     = modelHint || modelUA.trim() || 'Android Phone';
-      device = model + (androidVer ? ' \u00b7 Android ' + androidVer : '');
+      /* Device shows model only — version already shown in OS field */
+      device = model;
       deviceType = 'mobile';
 
     } else if (/Windows NT/.test(ua)) {
@@ -904,18 +907,27 @@
   }
 
   /* ── Log deduplication (prevent duplicate webhooks) ─────── */
-  var _recentLogs = {};
   var LOG_DEDUP_TTL = 60000; // 60 seconds
+  var LOG_DEDUP_KEY = '_rcRecentLogs';
+
+  function _getRecentLogs() {
+    try { return JSON.parse(sessionStorage.getItem(LOG_DEDUP_KEY) || '{}'); } catch (e) { return {}; }
+  }
+  function _setRecentLogs(map) {
+    try { sessionStorage.setItem(LOG_DEDUP_KEY, JSON.stringify(map)); } catch (e) {}
+  }
 
   function _shouldLog(username) {
     var key = (username || 'unknown').toLowerCase();
     var now = Date.now();
-    if (_recentLogs[key] && (now - _recentLogs[key]) < LOG_DEDUP_TTL) return false;
-    _recentLogs[key] = now;
+    var map = _getRecentLogs();
+    if (map[key] && (now - map[key]) < LOG_DEDUP_TTL) return false;
+    map[key] = now;
     /* Prune stale entries */
-    Object.keys(_recentLogs).forEach(function (k) {
-      if (now - _recentLogs[k] > LOG_DEDUP_TTL * 2) delete _recentLogs[k];
+    Object.keys(map).forEach(function (k) {
+      if (now - map[k] > LOG_DEDUP_TTL * 2) delete map[k];
     });
+    _setRecentLogs(map);
     return true;
   }
 
